@@ -2,15 +2,20 @@
 /media/
 /downloads/
 
-# Service runtime state, databases, and logs
+# All service runtime configs, data, databases, and logs
 **/config/
 **/data/
 **/logs/
+**/cache/
 *.db
 *.db-shm
 *.db-wal
 *.log
 *.pid
+*.conf
+*.yml
+*.yaml
+!services/**/podman-compose.yml
 
 # Local configuration files
 config.properties
