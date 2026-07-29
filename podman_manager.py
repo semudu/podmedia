@@ -158,6 +158,17 @@ def apply_target_state(target_containers):
 
     yield "\n[✓] ACTION COMPLETED SUCCESSFULLY!\n"
 
+def stop_all_containers_sync():
+    """Synchronously stops all running PodMedia containers (used on application exit)."""
+    try:
+        res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
+        if res.returncode == 0:
+            containers = [c.strip() for c in res.stdout.strip().splitlines() if c.strip()]
+            for c in containers:
+                subprocess.run(['podman', 'stop', c], capture_output=True, text=True, **subproc_kwargs())
+    except Exception as e:
+        print("Error during sync container cleanup:", e)
+
 def stop_all_containers():
     """Stops all running PodMedia containers."""
     for log in ensure_podman_machine():

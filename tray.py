@@ -54,6 +54,8 @@ class PodMediaTrayApp:
         threading.Thread(target=_run, daemon=True).start()
 
     def quit_app(self, icon, item):
+        print("[!] Quitting PodMedia: Stopping all running containers...")
+        podman_manager.stop_all_containers_sync()
         if self.on_quit_callback:
             self.on_quit_callback()
         icon.stop()

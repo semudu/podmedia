@@ -11,6 +11,10 @@ import urllib.parse
 import json
 
 import podman_manager
+import atexit
+
+# Ensure all PodMedia containers are stopped cleanly on application exit
+atexit.register(podman_manager.stop_all_containers_sync)
 
 PORT = podman_manager.PORT
 is_busy = False
