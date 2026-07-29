@@ -2,9 +2,12 @@ import os
 import subprocess
 import configparser
 
+# Project Root directory (parent of app/)
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
 # Load properties configuration
 config = configparser.ConfigParser()
-config_file = os.path.join(os.path.dirname(__file__), 'config.properties')
+config_file = os.path.join(project_root, 'config.properties')
 if os.path.exists(config_file):
     config.read(config_file)
 
@@ -43,9 +46,8 @@ def subproc_kwargs():
 
 def resolve_compose_path(path_str, cwd):
     """Converts media/downloads path into a clean POSIX path relative to cwd for podman-compose."""
-    base_dir = os.path.dirname(os.path.abspath(__file__))
-    target_dir = cwd if cwd else base_dir
-    abs_path = os.path.abspath(os.path.join(base_dir, path_str)) if not os.path.isabs(path_str) else path_str
+    target_dir = cwd if cwd else project_root
+    abs_path = os.path.abspath(os.path.join(project_root, path_str)) if not os.path.isabs(path_str) else path_str
     try:
         rel_path = os.path.relpath(abs_path, target_dir)
         return rel_path.replace('\\', '/')
@@ -123,8 +125,7 @@ def apply_target_state(target_containers):
     for log in ensure_network():
         yield log
 
-    base_dir = os.path.dirname(__file__)
-    services_dir = os.path.join(base_dir, 'services')
+    services_dir = os.path.join(project_root, 'services')
 
     # Start Plex if targeted
     if 'media_center_plex' in target_containers:
@@ -193,8 +194,7 @@ def organize_music():
     states, _ = get_container_states()
     if not states.get('media_center_beets', False):
         yield "[+] Starting Beets service...\n"
-        base_dir = os.path.dirname(__file__)
-        tools_dir = os.path.join(base_dir, 'services', 'tools')
+        tools_dir = os.path.join(project_root, 'services', 'tools')
         for log in run_command_generator('podman-compose up -d beets', cwd=tools_dir):
             yield log
 
@@ -224,8 +224,7 @@ def start_single_app(app_name):
     if app_name in app_map:
         folder, service = app_map[app_name]
         yield f"[+] Starting '{app_name.upper()}' service...\n"
-        base_dir = os.path.dirname(__file__)
-        work_dir = os.path.join(base_dir, 'services', folder)
+        work_dir = os.path.join(project_root, 'services', folder)
         for log in run_command_generator(f'podman-compose up -d {service}', cwd=work_dir):
             yield log
         yield f"\n[✓] '{app_name.upper()}' STARTED SUCCESSFULLY!\n"

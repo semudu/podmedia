@@ -1,2 +1,2 @@
 @echo off
-start "" pythonw app.py
+start "" pythonw app\app.py

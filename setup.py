@@ -131,7 +131,7 @@ def run_setup():
     print("\n[5/5] Setup Finished!")
     print("==================================================")
     print(" 🎉 PodMedia Dynamic Setup is Complete!")
-    print(" Run 'python app.py' to launch the System Tray App.")
+    print(" Run 'python app/app.py' to launch the System Tray App.")
     print("==================================================")
 
 if __name__ == "__main__":

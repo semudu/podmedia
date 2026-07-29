@@ -6,6 +6,34 @@ It provides selective, fine-grained control over your media automation ecosystem
 
 ---
 
+## 📂 Project Architecture
+
+```
+PodMedia/
+├── README.md                      # Comprehensive project documentation
+├── requirements.txt               # Python package dependencies
+├── setup.py                       # Automated environment & config initializer
+├── start_app.bat                  # Silent Windows launcher
+├── config.properties.example      # Root properties template
+├── app/                           # Application Source Code
+│   ├── app.py                     # HTTP Server & API Router
+│   ├── podman_manager.py          # Container Execution Engine
+│   ├── tray.py                    # Cross-Platform System Tray App
+│   ├── autostart.py               # Boot Startup Manager
+│   └── index.html                 # Dashboard UI Template
+└── services/                      # Container Service Specifications
+    ├── plex/
+    │   ├── podman-compose.yml
+    │   └── .env.example
+    └── tools/
+        ├── podman-compose.yml
+        ├── beets/
+        ├── qbittorrent/
+        └── slskd/
+```
+
+---
+
 ## ⚡ Key Features
 
 - **Automated Initialization**: Single command setup (`python setup.py`) that prepares pipeline directory structures, personal configuration templates, and verifies Podman VM health.
@@ -60,10 +88,11 @@ media_dir = E:/Media
 downloads_dir = D:/Downloads
 ```
 
-### Step 4: Launch Web Dashboard
+### Step 4: Launch Web Dashboard & System Tray App
 ```bash
-python app.py
+python app/app.py
 ```
+*(Or double-click `start_app.bat` on Windows)*
 
 ### Step 5: Access Control Panel
 Open **`http://localhost:3000`** in your browser or phone to start managing your media services!
