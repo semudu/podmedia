@@ -1,6 +1,13 @@
+import sys
+import os
+
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, 'w')
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, 'w')
+
 from http.server import HTTPServer, BaseHTTPRequestHandler
 import urllib.parse
-import os
 import json
 
 import podman_manager
@@ -186,7 +193,24 @@ class AppHandler(BaseHTTPRequestHandler):
 
 import threading
 
+def is_port_in_use(port):
+    import socket
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            return s.connect_ex(('127.0.0.1', port)) == 0
+    except Exception:
+        return False
+
 def run():
+    if is_port_in_use(PORT):
+        print(f"[i] PodMedia is already running on http://localhost:{PORT}")
+        try:
+            import webbrowser
+            webbrowser.open(f"http://localhost:{PORT}")
+        except Exception:
+            pass
+        sys.exit(0)
+
     server_address = ('0.0.0.0', PORT)
     httpd = AppHTTPServer(server_address, AppHandler)
     

@@ -1,3 +1,2 @@
 @echo off
-echo Starting PodMedia System Tray Application...
 start "" pythonw app.py
