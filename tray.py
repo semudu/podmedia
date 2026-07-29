@@ -93,4 +93,7 @@ class PodMediaTrayApp:
         menu = self.build_menu()
         self.icon = pystray.Icon("PodMedia", image, "PodMedia Hub", menu)
         print("[✓] PodMedia System Tray Icon initialized.")
-        self.icon.run()
+        try:
+            self.icon.run_detached()
+        except Exception:
+            self.icon.run()
