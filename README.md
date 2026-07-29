@@ -12,8 +12,7 @@ It provides selective, fine-grained control over your media automation ecosystem
 PodMedia/
 ├── README.md                      # Comprehensive project documentation
 ├── requirements.txt               # Python package dependencies
-├── setup.py                       # Automated environment & config initializer
-├── start_app.bat                  # Silent Windows launcher
+├── setup.py                       # Automated environment, config & launcher generator
 ├── config.properties.example      # Root properties template
 ├── app/                           # Application Source Code
 │   ├── app.py                     # HTTP Server & API Router
@@ -36,7 +35,7 @@ PodMedia/
 
 ## ⚡ Key Features
 
-- **Automated Initialization**: Single command setup (`python setup.py`) that prepares pipeline directory structures, personal configuration templates, and verifies Podman VM health.
+- **Automated Initialization**: Single command setup (`python setup.py`) that prepares pipeline directory structures, personal configuration templates, OS-specific launchers (`start.bat` / `start.sh`), and verifies Podman VM health.
 - **Selective Container Control**: 1-second instant toggle switches for individual applications or predefined operation modes (*Stream Mode*, *Download Mode*, *Music Mode*).
 - **Automated Music Pipeline**: Soulseek (Slskd) downloads FLAC/MP3 tracks directly into `/downloads/music`, where Beets auto-tags them via MusicBrainz/Discogs/iTunes and moves them cleanly to `/media/music`.
 - **Real-Time Stream Logs**: Built-in Server-Sent Events (SSE) modal streams live Podman CLI execution logs directly to your browser.
@@ -78,7 +77,7 @@ cd PodMedia
 ```bash
 python setup.py
 ```
-*This step creates local directory structures (`downloads/`, `media/`), generates personalized local `.env`, `slskd.yml`, `config.yaml`, `qBittorrent.conf`, and verifies your Podman machine health.*
+*This step creates local directory structures (`downloads/`, `media/`), generates personalized local `.env`, `slskd.yml`, `config.yaml`, `qBittorrent.conf`, generates OS-specific launcher (`start.bat` / `start.sh`), and verifies your Podman machine health.*
 
 ### Step 3: (Optional) Custom Directory Paths
 If you store your media on external drives (e.g. `E:/Media` or `D:/Downloads`), edit your generated `config.properties`:
@@ -88,11 +87,9 @@ media_dir = E:/Media
 downloads_dir = D:/Downloads
 ```
 
-### Step 4: Launch Web Dashboard & System Tray App
-```bash
-python app/app.py
-```
-*(Or double-click `start_app.bat` on Windows)*
+### Step 4: Launch PodMedia
+- **On Windows**: Double-click `start.bat` or run `.\start.bat`
+- **On macOS / Linux**: Run `./start.sh`
 
 ### Step 5: Access Control Panel
 Open **`http://localhost:3000`** in your browser or phone to start managing your media services!

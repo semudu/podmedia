@@ -3,6 +3,7 @@ import sys
 import subprocess
 import shutil
 import configparser
+import platform
 
 BANNER = """
 ==================================================
@@ -128,10 +129,31 @@ def run_setup():
     else:
         print(" [✓] Podman VM is active and running.")
 
-    print("\n[5/5] Setup Finished!")
-    print("==================================================")
-    print(" 🎉 PodMedia Dynamic Setup is Complete!")
-    print(" Run 'python app/app.py' to launch the System Tray App.")
+    # 5. OS-Specific Launcher Script Generation
+    print("\n[5/5] Generating OS-Specific Launcher Script...")
+    system_os = platform.system()
+    if system_os == "Windows":
+        launcher_path = os.path.join(base_dir, "start.bat")
+        content = "@echo off\nstart \"\" pythonw app\\app.py\n"
+        with open(launcher_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        print(" [✓] Created Windows launcher: 'start.bat'")
+        launch_msg = "Run '.\\start.bat' or double-click 'start.bat' to launch PodMedia."
+    else:
+        launcher_path = os.path.join(base_dir, "start.sh")
+        content = "#!/usr/bin/env bash\npython3 app/app.py &\n"
+        with open(launcher_path, "w", encoding="utf-8") as f:
+            f.write(content)
+        try:
+            os.chmod(launcher_path, 0o755)
+        except Exception:
+            pass
+        print(" [✓] Created Unix launcher: 'start.sh' (chmod +x)")
+        launch_msg = "Run './start.sh' to launch PodMedia."
+
+    print("\n==================================================")
+    print(" 🎉 PodMedia Setup Completed Successfully!")
+    print(f" {launch_msg}")
     print("==================================================")
 
 if __name__ == "__main__":

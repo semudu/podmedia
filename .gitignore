@@ -24,6 +24,10 @@ config.properties
 **/.env.local
 !**/.env.example
 
+# Dynamically generated OS Launchers
+start.bat
+start.sh
+
 # Python cache & virtual environments
 __pycache__/
 *.pyc
