@@ -2,6 +2,7 @@ import os
 import sys
 import subprocess
 import shutil
+import configparser
 
 BANNER = """
 ==================================================
@@ -44,32 +45,22 @@ def run_setup():
     else:
         print(" [✓] podman-compose detected.")
 
-    # 2. Directory Creation (Downloads -> Beets -> Media Pipeline)
-    print("\n[2/5] Creating Directory & Pipeline Structure...")
-    directories = [
-        os.path.join(base_dir, "downloads", "incomplete"),
-        os.path.join(base_dir, "downloads", "music"),
-        os.path.join(base_dir, "media", "movies"),
-        os.path.join(base_dir, "media", "tv"),
-        os.path.join(base_dir, "media", "music"),
-        os.path.join(base_dir, "services", "tools", "slskd", "config"),
-        os.path.join(base_dir, "services", "tools", "beets", "config"),
-        os.path.join(base_dir, "services", "tools", "qbittorrent", "config", "qBittorrent"),
-    ]
-
-    for d in directories:
-        os.makedirs(d, exist_ok=True)
-        print(f" [✓] Verified directory: {os.path.relpath(d, base_dir)}")
-
-    # 3. Personalized Configuration Initialization
-    print("\n[3/5] Initializing Personalized Service Configurations...")
+    # 2. Config & Environment Initialization
+    print("\n[2/5] Initializing Personalized Service Configurations...")
 
     # Root config.properties
-    copy_template_if_missing(
-        os.path.join(base_dir, "config.properties.example"),
-        os.path.join(base_dir, "config.properties"),
-        "Root Server Properties (config.properties)"
-    )
+    config_file = os.path.join(base_dir, "config.properties")
+    example_config = os.path.join(base_dir, "config.properties.example")
+    copy_template_if_missing(example_config, config_file, "Root Server Properties (config.properties)")
+
+    # Read active paths from config.properties
+    cfg = configparser.ConfigParser()
+    cfg.read(config_file)
+    raw_media_dir = cfg.get("paths", "media_dir", fallback="./media")
+    raw_downloads_dir = cfg.get("paths", "downloads_dir", fallback="./downloads")
+
+    media_dir = os.path.abspath(os.path.join(base_dir, raw_media_dir)) if not os.path.isabs(raw_media_dir) else raw_media_dir
+    downloads_dir = os.path.abspath(os.path.join(base_dir, raw_downloads_dir)) if not os.path.isabs(raw_downloads_dir) else raw_downloads_dir
 
     # Plex .env
     copy_template_if_missing(
@@ -99,6 +90,26 @@ def run_setup():
         "qBittorrent Client (services/tools/qbittorrent/config/qBittorrent/qBittorrent.conf)"
     )
 
+    # 3. Dynamic Directory Creation Based on config.properties
+    print("\n[3/5] Creating Dynamic Directory & Pipeline Structure...")
+    print(f" [i] Active Media Directory    : {media_dir}")
+    print(f" [i] Active Downloads Directory: {downloads_dir}")
+
+    directories = [
+        os.path.join(downloads_dir, "incomplete"),
+        os.path.join(downloads_dir, "music"),
+        os.path.join(media_dir, "movies"),
+        os.path.join(media_dir, "tv"),
+        os.path.join(media_dir, "music"),
+        os.path.join(base_dir, "services", "tools", "slskd", "config"),
+        os.path.join(base_dir, "services", "tools", "beets", "config"),
+        os.path.join(base_dir, "services", "tools", "qbittorrent", "config", "qBittorrent"),
+    ]
+
+    for d in directories:
+        os.makedirs(d, exist_ok=True)
+        print(f" [✓] Verified directory: {d}")
+
     # 4. Podman Machine Health
     print("\n[4/5] Checking Podman VM Health...")
     res = subprocess.run(["podman", "info"], capture_output=True, text=True)
@@ -110,7 +121,7 @@ def run_setup():
 
     print("\n[5/5] Setup Finished!")
     print("==================================================")
-    print(" 🎉 PodMedia Personalized Setup is Complete!")
+    print(" 🎉 PodMedia Dynamic Setup is Complete!")
     print(" Run 'python app.py' to launch the web dashboard.")
     print("==================================================")
 

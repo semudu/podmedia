@@ -38,10 +38,16 @@ def run_command_generator(cmd, cwd=None):
     """Executes a command and yields stdout/stderr line by line in real-time."""
     yield f"$ {cmd}\n"
     try:
+        env = os.environ.copy()
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        env['MEDIA_DIR'] = os.path.abspath(os.path.join(base_dir, MEDIA_DIR)) if not os.path.isabs(MEDIA_DIR) else MEDIA_DIR
+        env['DOWNLOADS_DIR'] = os.path.abspath(os.path.join(base_dir, DOWNLOADS_DIR)) if not os.path.isabs(DOWNLOADS_DIR) else DOWNLOADS_DIR
+
         process = subprocess.Popen(
             cmd,
             shell=True,
             cwd=cwd,
+            env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,

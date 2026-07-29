@@ -12,11 +12,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Istanbul
+      - TZ=${TZ:-Europe/Istanbul}
     volumes:
       - ./radarr/config:/config:Z
-      - ../../media/movies:/movies:Z
-      - ../../downloads:/downloads:Z
+      - ${MEDIA_DIR:-../../media}/movies:/movies:Z
+      - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "7878:7878"
     networks:
@@ -29,11 +29,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Istanbul
+      - TZ=${TZ:-Europe/Istanbul}
     volumes:
       - ./sonarr/config:/config:Z
-      - ../../media/tv:/tv:Z
-      - ../../downloads:/downloads:Z
+      - ${MEDIA_DIR:-../../media}/tv:/tv:Z
+      - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "8989:8989"
     networks:
@@ -46,7 +46,7 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Istanbul
+      - TZ=${TZ:-Europe/Istanbul}
     volumes:
       - ./prowlarr/config:/config:Z
     ports:
@@ -63,11 +63,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Istanbul
+      - TZ=${TZ:-Europe/Istanbul}
       - WEBUI_PORT=8080
     volumes:
       - ./qbittorrent/config:/config:Z
-      - ../../downloads:/downloads:Z
+      - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "8080:8080"
     networks:
@@ -93,12 +93,12 @@ services:
       - SLSKD_CONFIG=/app/slskd.yml
       - SLSKD_WEB__AUTHENTICATION__ENABLED=false
       - SLSKD_NO_AUTH=true
-      - TZ=Europe/Istanbul
+      - TZ=${TZ:-Europe/Istanbul}
     volumes:
       - ./slskd/config/slskd.yml:/app/slskd.yml:Z
       - ./slskd/config:/app/data:Z
-      - ../../media/music:/music:Z
-      - ../../downloads:/downloads:Z
+      - ${MEDIA_DIR:-../../media}/music:/music:Z
+      - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "5030:5030"
       - "5031:5031"
@@ -113,11 +113,11 @@ services:
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Istanbul
+      - TZ=${TZ:-Europe/Istanbul}
     volumes:
       - ./beets/config:/config:Z
-      - ../../media/music:/music:Z
-      - ../../downloads:/downloads:Z
+      - ${MEDIA_DIR:-../../media}/music:/music:Z
+      - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     networks:
       - media_center_net
     restart: unless-stopped

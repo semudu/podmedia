@@ -18,7 +18,7 @@ services:
       - ADVERTISE_IP=${PLEX_ADVERTISE_IP:-http://localhost:32400}
     volumes:
       - ./config:/config:Z
-      - ../../media:/media:Z
+      - ${MEDIA_DIR:-../../media}:/media:Z
     ports:
       - "32400:32400"
       - "3005:3005"
