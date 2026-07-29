@@ -1,0 +1,35 @@
+version: "3.8"
+
+networks:
+  media_center_net:
+    name: media_center_net
+    driver: bridge
+
+services:
+  plex:
+    container_name: media_center_plex
+    hostname: home-win11
+    image: lscr.io/linuxserver/plex:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+      - VERSION=latest
+      - ADVERTISE_IP=http://192.168.1.25:32400
+    volumes:
+      - ./config:/config:Z
+      - ../../media:/media:Z
+    ports:
+      - "32400:32400"
+      - "3005:3005"
+      - "8324:8324"
+      - "32469:32469"
+      - "1900:1900/udp"
+      - "32400:32400/udp"
+      - "32410:32410/udp"
+      - "32412:32412/udp"
+      - "32413:32413/udp"
+      - "32414:32414/udp"
+    networks:
+      - media_center_net
+    restart: unless-stopped

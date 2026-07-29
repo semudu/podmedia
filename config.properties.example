@@ -1,0 +1,9 @@
+[server]
+port = 3000
+
+[paths]
+media_dir = ./media
+downloads_dir = ./downloads
+
+[podman]
+network = media_center_net

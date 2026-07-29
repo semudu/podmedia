@@ -1,0 +1,28 @@
+# Media & Downloads directories
+/media/
+/downloads/
+
+# Service runtime state, databases, and logs
+**/config/
+**/data/
+**/logs/
+*.db
+*.db-shm
+*.db-wal
+*.log
+*.pid
+
+# Local configuration files
+config.properties
+
+# Python cache & virtual environments
+__pycache__/
+*.pyc
+.venv/
+env/
+venv/
+
+# IDE & Tool directories
+.idea/
+.vscode/
+.agents/

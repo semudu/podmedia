@@ -1,0 +1,123 @@
+version: "3.8"
+
+networks:
+  media_center_net:
+    name: media_center_net
+    driver: bridge
+
+services:
+  radarr:
+    container_name: media_center_radarr
+    image: lscr.io/linuxserver/radarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+    volumes:
+      - ./radarr/config:/config:Z
+      - ../../media/movies:/movies:Z
+      - ../../downloads:/downloads:Z
+    ports:
+      - "7878:7878"
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+  sonarr:
+    container_name: media_center_sonarr
+    image: lscr.io/linuxserver/sonarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+    volumes:
+      - ./sonarr/config:/config:Z
+      - ../../media/tv:/tv:Z
+      - ../../downloads:/downloads:Z
+    ports:
+      - "8989:8989"
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+  prowlarr:
+    container_name: media_center_prowlarr
+    image: lscr.io/linuxserver/prowlarr:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+    volumes:
+      - ./prowlarr/config:/config:Z
+    ports:
+      - "9696:9696"
+    depends_on:
+      - flaresolverr
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+  qbittorrent:
+    container_name: media_center_qbittorrent
+    image: lscr.io/linuxserver/qbittorrent:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+      - WEBUI_PORT=8080
+    volumes:
+      - ./qbittorrent/config:/config:Z
+      - ../../downloads:/downloads:Z
+    ports:
+      - "8080:8080"
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+  flaresolverr:
+    container_name: media_center_flaresolverr
+    image: ghcr.io/flaresolverr/flaresolverr:latest
+    ports:
+      - "8191:8191"
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+  slskd:
+    container_name: media_center_slskd
+    image: ghcr.io/slskd/slskd:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - SLSKD_REMOTE_CONFIGURATION=true
+      - SLSKD_CONFIG=/app/slskd.yml
+      - SLSKD_WEB__AUTHENTICATION__ENABLED=false
+      - SLSKD_NO_AUTH=true
+      - TZ=Europe/Istanbul
+    volumes:
+      - ./slskd/config/slskd.yml:/app/slskd.yml:Z
+      - ./slskd/config:/app/data:Z
+      - ../../media/music:/music:Z
+      - ../../downloads:/downloads:Z
+    ports:
+      - "5030:5030"
+      - "5031:5031"
+      - "50300:50300"
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+  beets:
+    container_name: media_center_beets
+    image: lscr.io/linuxserver/beets:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=Europe/Istanbul
+    volumes:
+      - ./beets/config:/config:Z
+      - ../../media/music:/music:Z
+      - ../../downloads:/downloads:Z
+    networks:
+      - media_center_net
+    restart: unless-stopped
