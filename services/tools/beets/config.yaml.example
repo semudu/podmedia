@@ -1,0 +1,44 @@
+directory: /music
+library: /config/musiclibrary.db
+
+import:
+  move: true
+  write: true
+  copy: false
+  autotag: true
+  quiet: true
+  fallback: asis
+  timid: false
+  log: /config/beets.log
+
+clutter:
+  - "Thumbs.db"
+  - ".DS_Store"
+
+plugins: fetchart embedart lastgenre ftintitle scrub web
+
+web:
+  host: 0.0.0.0
+  port: 8337
+
+fetchart:
+  auto: true
+  minwidth: 500
+  maxwidth: 1200
+  sources:
+    - filesystem
+    - coverart
+    - itunes
+    - amazon
+    - albumart
+
+embedart:
+  auto: true
+
+lastgenre:
+  auto: true
+
+paths:
+  default: $albumartist/$album ($year)/$track - $title
+  singleton: Single/$artist - $title
+  comp: Compilations/$album ($year)/$track - $title

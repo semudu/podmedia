@@ -5,13 +5,25 @@ import shutil
 
 BANNER = """
 ==================================================
-  🍿 PodMedia Setup & Initialization
+  🍿 PodMedia Setup & Initialization Engine
 ==================================================
 """
 
 def check_command(cmd):
     """Checks if a CLI command is available on system PATH."""
     return shutil.which(cmd) is not None
+
+def copy_template_if_missing(src_example, dest_target, description):
+    """Utility to copy a template file to target path if target does not exist."""
+    if not os.path.exists(dest_target):
+        if os.path.exists(src_example):
+            os.makedirs(os.path.dirname(dest_target), exist_ok=True)
+            shutil.copyfile(src_example, dest_target)
+            print(f" [✓] Initialized {description} from template.")
+        else:
+            print(f" [!] Template missing for {description} ({src_example}).")
+    else:
+        print(f" [✓] Verified local config for {description}.")
 
 def run_setup():
     print(BANNER)
@@ -32,8 +44,8 @@ def run_setup():
     else:
         print(" [✓] podman-compose detected.")
 
-    # 2. Directory Creation
-    print("\n[2/5] Creating Directory Structure...")
+    # 2. Directory Creation (Downloads -> Beets -> Media Pipeline)
+    print("\n[2/5] Creating Directory & Pipeline Structure...")
     directories = [
         os.path.join(base_dir, "downloads", "incomplete"),
         os.path.join(base_dir, "downloads", "music"),
@@ -49,52 +61,45 @@ def run_setup():
         os.makedirs(d, exist_ok=True)
         print(f" [✓] Verified directory: {os.path.relpath(d, base_dir)}")
 
-    # 3. Config & Environment Initialization
-    print("\n[3/5] Initializing Configuration Files...")
-    config_file = os.path.join(base_dir, "config.properties")
-    example_config = os.path.join(base_dir, "config.properties.example")
+    # 3. Personalized Configuration Initialization
+    print("\n[3/5] Initializing Personalized Service Configurations...")
 
-    if not os.path.exists(config_file) and os.path.exists(example_config):
-        shutil.copyfile(example_config, config_file)
-        print(" [✓] Created 'config.properties' from example template.")
-    else:
-        print(" [✓] 'config.properties' exists.")
+    # Root config.properties
+    copy_template_if_missing(
+        os.path.join(base_dir, "config.properties.example"),
+        os.path.join(base_dir, "config.properties"),
+        "Root Server Properties (config.properties)"
+    )
 
-    # Plex Local .env Setup
-    plex_env = os.path.join(base_dir, "services", "plex", ".env")
-    plex_env_example = os.path.join(base_dir, "services", "plex", ".env.example")
-    if not os.path.exists(plex_env) and os.path.exists(plex_env_example):
-        shutil.copyfile(plex_env_example, plex_env)
-        print(" [✓] Created 'services/plex/.env' local config from template.")
-    else:
-        print(" [✓] 'services/plex/.env' exists.")
+    # Plex .env
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "plex", ".env.example"),
+        os.path.join(base_dir, "services", "plex", ".env"),
+        "Plex Local Environment (services/plex/.env)"
+    )
 
-    # 4. Slskd Default Config Setup
-    slskd_config = os.path.join(base_dir, "services", "tools", "slskd", "config", "slskd.yml")
-    if not os.path.exists(slskd_config):
-        slskd_content = """web:
-  port: 5030
-  authentication:
-    enabled: false
+    # Slskd Config (Soulseek FLAC Downloader)
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "tools", "slskd", "slskd.yml.example"),
+        os.path.join(base_dir, "services", "tools", "slskd", "config", "slskd.yml"),
+        "Slskd Downloader (services/tools/slskd/config/slskd.yml)"
+    )
 
-soulseek:
-  username: "slsk_user"
-  password: "slsk_password"
-  listen_port: 50300
+    # Beets Config (Music Auto-Tagger)
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "tools", "beets", "config.yaml.example"),
+        os.path.join(base_dir, "services", "tools", "beets", "config", "config.yaml"),
+        "Beets Music Auto-Tagger (services/tools/beets/config/config.yaml)"
+    )
 
-shares:
-  directories:
-    - /music
+    # qBittorrent Config (Torrent Downloader)
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "tools", "qbittorrent", "qBittorrent.conf.example"),
+        os.path.join(base_dir, "services", "tools", "qbittorrent", "config", "qBittorrent", "qBittorrent.conf"),
+        "qBittorrent Client (services/tools/qbittorrent/config/qBittorrent/qBittorrent.conf)"
+    )
 
-directories:
-  incomplete: /downloads/incomplete
-  downloads: /downloads/music
-"""
-        with open(slskd_config, "w", encoding="utf-8") as f:
-            f.write(slskd_content)
-        print(" [✓] Created default 'slskd.yml' configuration.")
-
-    # 5. Podman Machine Health
+    # 4. Podman Machine Health
     print("\n[4/5] Checking Podman VM Health...")
     res = subprocess.run(["podman", "info"], capture_output=True, text=True)
     if res.returncode != 0:
@@ -105,7 +110,7 @@ directories:
 
     print("\n[5/5] Setup Finished!")
     print("==================================================")
-    print(" 🎉 PodMedia is ready!")
+    print(" 🎉 PodMedia Personalized Setup is Complete!")
     print(" Run 'python app.py' to launch the web dashboard.")
     print("==================================================")
 

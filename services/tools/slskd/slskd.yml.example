@@ -1,0 +1,19 @@
+web:
+  port: 5030
+  authentication:
+    enabled: false
+  api_keys:
+    - "slskd_secret_api_key_2026"
+
+soulseek:
+  username: "slsk_user"
+  password: "slsk_password"
+  listen_port: 50300
+
+shares:
+  directories:
+    - /music
+
+directories:
+  incomplete: /downloads/incomplete
+  downloads: /downloads/music
