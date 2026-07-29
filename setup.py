@@ -113,12 +113,18 @@ def run_setup():
         os.makedirs(d, exist_ok=True)
         print(f" [✓] Verified directory: {d}")
 
+    def subproc_kwargs():
+        kwargs = {}
+        if os.name == 'nt':
+            kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+        return kwargs
+
     # 4. Podman Machine Health
     print("\n[4/5] Checking Podman VM Health...")
-    res = subprocess.run(["podman", "info"], capture_output=True, text=True)
+    res = subprocess.run(["podman", "info"], capture_output=True, text=True, **subproc_kwargs())
     if res.returncode != 0:
         print(" [!] Podman machine is offline. Attempting start...")
-        subprocess.run(["podman", "machine", "start"])
+        subprocess.run(["podman", "machine", "start"], **subproc_kwargs())
     else:
         print(" [✓] Podman VM is active and running.")
 

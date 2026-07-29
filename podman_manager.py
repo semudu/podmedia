@@ -34,6 +34,13 @@ TOOL_MAP = {
     'media_center_beets': 'beets'
 }
 
+def subproc_kwargs():
+    """Returns platform-specific subprocess arguments to prevent terminal window flashing on Windows."""
+    kwargs = {}
+    if os.name == 'nt':
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+    return kwargs
+
 def run_command_generator(cmd, cwd=None):
     """Executes a command and yields stdout/stderr line by line in real-time."""
     yield f"$ {cmd}\n"
@@ -51,7 +58,8 @@ def run_command_generator(cmd, cwd=None):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
-            bufsize=1
+            bufsize=1,
+            **subproc_kwargs()
         )
         for line in iter(process.stdout.readline, ''):
             yield line
@@ -62,7 +70,7 @@ def run_command_generator(cmd, cwd=None):
 
 def ensure_podman_machine():
     """Returns True if podman machine is running, else attempts to start it."""
-    res = subprocess.run(['podman', 'info'], capture_output=True, text=True)
+    res = subprocess.run(['podman', 'info'], capture_output=True, text=True, **subproc_kwargs())
     if res.returncode != 0:
         yield "[!] Podman machine is offline, starting (podman machine start)...\n"
         for line in run_command_generator('podman machine start'):
@@ -72,7 +80,7 @@ def ensure_podman_machine():
 
 def ensure_network():
     """Ensures that the dedicated Podman network exists."""
-    res = subprocess.run(['podman', 'network', 'ls', '--format', '{{.Name}}'], capture_output=True, text=True)
+    res = subprocess.run(['podman', 'network', 'ls', '--format', '{{.Name}}'], capture_output=True, text=True, **subproc_kwargs())
     if NETWORK_NAME not in res.stdout.splitlines():
         yield f"[+] Creating network '{NETWORK_NAME}'...\n"
         for line in run_command_generator(f'podman network create {NETWORK_NAME}'):
@@ -82,7 +90,7 @@ def get_container_states():
     """Queries running containers and computes group states."""
     running_set = set()
     try:
-        res = subprocess.run(['podman', 'ps', '--format', '{{.Names}}'], capture_output=True, text=True, timeout=5)
+        res = subprocess.run(['podman', 'ps', '--format', '{{.Names}}'], capture_output=True, text=True, timeout=5, **subproc_kwargs())
         if res.returncode == 0:
             for line in res.stdout.strip().splitlines():
                 if line.strip():
@@ -129,7 +137,7 @@ def apply_target_state(target_containers):
             yield log
 
     # Stop unneeded containers
-    res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True)
+    res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
     if res.returncode == 0:
         for c in res.stdout.strip().splitlines():
             c = c.strip()
@@ -146,7 +154,7 @@ def stop_all_containers():
         yield log
     
     yield "[!] Stopping all PodMedia services...\n"
-    res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True)
+    res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
     if res.returncode == 0:
         for c in res.stdout.strip().splitlines():
             c = c.strip()
