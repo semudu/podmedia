@@ -53,6 +53,35 @@
             gap: 10px;
         }
 
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .active-badge {
+            background: rgba(30, 41, 59, 0.8);
+            border: 1px solid var(--border);
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background-color: var(--accent-green);
+            box-shadow: 0 0 8px var(--accent-green);
+            transition: all 0.3s;
+        }
+
         .btn-master {
             padding: 10px 20px;
             border-radius: 8px;
@@ -327,9 +356,18 @@
 
     <header>
         <h1>🍿 PodMedia Hub</h1>
-        <button id="master-btn" class="btn-master start" onclick="handleMasterAction()">
-            ▶️ Start All
-        </button>
+        <div class="header-actions">
+            <div class="active-badge" id="active-summary">
+                <span class="pulse-dot" id="pulse-dot"></span>
+                <span id="active-count">0 / 8 Active</span>
+            </div>
+            <button id="start-all-btn" class="btn-master start" onclick="triggerAction('start-all', '')">
+                ▶️ Start All
+            </button>
+            <button id="stop-all-btn" class="btn-master stop" onclick="triggerAction('stop-all', '')">
+                🛑 Stop All
+            </button>
+        </div>
     </header>
 
     <!-- PRESET GROUPS -->
@@ -522,17 +560,67 @@
 
             anyRunning = Object.values(containers).some(val => val === true);
 
-            // Master Button Update
-            const masterBtn = document.getElementById('master-btn');
+            // Service Counts & Active Summary Badge
+            const totalServices = Object.keys(containers).length || 8;
+            const runningCount = Object.values(containers).filter(v => v === true).length;
+            const allRunning = (runningCount === totalServices);
+            const allStopped = (runningCount === 0);
+
+            const activeCountText = document.getElementById('active-count');
+            const pulseDot = document.getElementById('pulse-dot');
+            if (activeCountText) {
+                activeCountText.innerText = `${runningCount} / ${totalServices} Active`;
+            }
+            if (pulseDot) {
+                pulseDot.style.backgroundColor = runningCount > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
+                pulseDot.style.boxShadow = runningCount > 0 ? '0 0 10px var(--accent-green)' : 'none';
+            }
+
+            // Dual Master Buttons Logic
+            const startAllBtn = document.getElementById('start-all-btn');
+            const stopAllBtn = document.getElementById('stop-all-btn');
+
             if (isSystemBusy) {
-                masterBtn.className = 'btn-master busy';
-                masterBtn.innerHTML = '⏳ Processing...';
-            } else if (anyRunning) {
-                masterBtn.className = 'btn-master stop';
-                masterBtn.innerHTML = '🛑 Stop All';
+                if (startAllBtn) {
+                    startAllBtn.style.display = 'inline-flex';
+                    startAllBtn.className = 'btn-master busy';
+                    startAllBtn.innerHTML = '⏳ Processing...';
+                }
+                if (stopAllBtn) {
+                    stopAllBtn.style.display = 'none';
+                }
             } else {
-                masterBtn.className = 'btn-master start';
-                masterBtn.innerHTML = '▶️ Start All';
+                if (allStopped) {
+                    if (startAllBtn) {
+                        startAllBtn.style.display = 'inline-flex';
+                        startAllBtn.className = 'btn-master start';
+                        startAllBtn.innerHTML = '▶️ Start All';
+                    }
+                    if (stopAllBtn) {
+                        stopAllBtn.style.display = 'none';
+                    }
+                } else if (allRunning) {
+                    if (startAllBtn) {
+                        startAllBtn.style.display = 'none';
+                    }
+                    if (stopAllBtn) {
+                        stopAllBtn.style.display = 'inline-flex';
+                        stopAllBtn.className = 'btn-master stop';
+                        stopAllBtn.innerHTML = '🛑 Stop All';
+                    }
+                } else {
+                    // Mixed state: Some running, some stopped! Show BOTH!
+                    if (startAllBtn) {
+                        startAllBtn.style.display = 'inline-flex';
+                        startAllBtn.className = 'btn-master start';
+                        startAllBtn.innerHTML = '▶️ Start All';
+                    }
+                    if (stopAllBtn) {
+                        stopAllBtn.style.display = 'inline-flex';
+                        stopAllBtn.className = 'btn-master stop';
+                        stopAllBtn.innerHTML = '🛑 Stop All';
+                    }
+                }
             }
 
             // Disable toggles if busy
