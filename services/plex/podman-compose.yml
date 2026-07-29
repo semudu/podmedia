@@ -8,14 +8,12 @@ networks:
 services:
   plex:
     container_name: media_center_plex
-    hostname: home-win11
     image: lscr.io/linuxserver/plex:latest
     environment:
       - PUID=1000
       - PGID=1000
-      - TZ=Europe/Istanbul
+      - TZ=UTC
       - VERSION=latest
-      - ADVERTISE_IP=http://192.168.1.25:32400
     volumes:
       - ./config:/config:Z
       - ../../media:/media:Z

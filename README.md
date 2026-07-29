@@ -8,11 +8,12 @@ It provides selective, fine-grained control over your media automation ecosystem
 
 ## ⚡ Features
 
+- **Automated Initialization**: One-command setup (`python setup.py`) that prepares directory structures, configuration templates, and verifies Podman VM health.
 - **Selective Container Control**: Fast 1-second toggle switches for individual applications or predefined mode groups (*Stream Mode*, *Download Mode*, *Music Mode*).
 - **Real-Time Stream Logs**: Built-in Server-Sent Events (SSE) modal streams live Podman CLI logs directly to your browser.
-- **Rootless & Secure**: Built from the ground up for Podman & Podman Compose.
+- **Rootless & Secure**: Built from the ground up for Podman & Podman Compose with clean, dynamic template configs.
 - **Automated Music Management**: Dedicated Beets auto-tagging trigger for FLAC/MP3 libraries downloaded via Slskd or torrents.
-- **Smart Quality Management**: Automated database optimization to cap release sizes (movies & TV episodes) while blocking raw 4K/REMUX dumps.
+- **Smart Quality Management**: Automated database optimization script (`python configure_dbs.py`) to cap release sizes while blocking raw 4K/REMUX dumps.
 
 ---
 
@@ -39,10 +40,9 @@ It provides selective, fine-grained control over your media automation ecosystem
    cd PodMedia
    ```
 
-2. **Configure your paths**:
-   Copy `config.properties.example` to `config.properties`:
+2. **Run Initialization Script**:
    ```bash
-   cp config.properties.example config.properties
+   python setup.py
    ```
 
 3. **Start the Web Dashboard**:
