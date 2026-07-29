@@ -41,14 +41,24 @@ def subproc_kwargs():
         kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
     return kwargs
 
+def resolve_compose_path(path_str, cwd):
+    """Converts media/downloads path into a clean POSIX path relative to cwd for podman-compose."""
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    target_dir = cwd if cwd else base_dir
+    abs_path = os.path.abspath(os.path.join(base_dir, path_str)) if not os.path.isabs(path_str) else path_str
+    try:
+        rel_path = os.path.relpath(abs_path, target_dir)
+        return rel_path.replace('\\', '/')
+    except Exception:
+        return abs_path.replace('\\', '/')
+
 def run_command_generator(cmd, cwd=None):
     """Executes a command and yields stdout/stderr line by line in real-time."""
     yield f"$ {cmd}\n"
     try:
         env = os.environ.copy()
-        base_dir = os.path.dirname(os.path.abspath(__file__))
-        env['MEDIA_DIR'] = os.path.abspath(os.path.join(base_dir, MEDIA_DIR)) if not os.path.isabs(MEDIA_DIR) else MEDIA_DIR
-        env['DOWNLOADS_DIR'] = os.path.abspath(os.path.join(base_dir, DOWNLOADS_DIR)) if not os.path.isabs(DOWNLOADS_DIR) else DOWNLOADS_DIR
+        env['MEDIA_DIR'] = resolve_compose_path(MEDIA_DIR, cwd)
+        env['DOWNLOADS_DIR'] = resolve_compose_path(DOWNLOADS_DIR, cwd)
 
         process = subprocess.Popen(
             cmd,
