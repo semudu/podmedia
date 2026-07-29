@@ -13,7 +13,6 @@ It provides selective, fine-grained control over your media automation ecosystem
 - **Real-Time Stream Logs**: Built-in Server-Sent Events (SSE) modal streams live Podman CLI logs directly to your browser.
 - **Rootless & Secure**: Built from the ground up for Podman & Podman Compose with clean, dynamic template configs.
 - **Automated Music Management**: Dedicated Beets auto-tagging trigger for FLAC/MP3 libraries downloaded via Slskd or torrents.
-- **Smart Quality Management**: Automated database optimization script (`python configure_dbs.py`) to cap release sizes while blocking raw 4K/REMUX dumps.
 
 ---
 
