@@ -8,12 +8,14 @@ networks:
 services:
   plex:
     container_name: media_center_plex
+    hostname: ${PLEX_HOSTNAME:-podmedia}
     image: lscr.io/linuxserver/plex:latest
     environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=UTC
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-1000}
+      - TZ=${TZ:-UTC}
       - VERSION=latest
+      - ADVERTISE_IP=${PLEX_ADVERTISE_IP:-http://localhost:32400}
     volumes:
       - ./config:/config:Z
       - ../../media:/media:Z

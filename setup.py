@@ -49,7 +49,7 @@ def run_setup():
         os.makedirs(d, exist_ok=True)
         print(f" [✓] Verified directory: {os.path.relpath(d, base_dir)}")
 
-    # 3. Config Initialization
+    # 3. Config & Environment Initialization
     print("\n[3/5] Initializing Configuration Files...")
     config_file = os.path.join(base_dir, "config.properties")
     example_config = os.path.join(base_dir, "config.properties.example")
@@ -59,6 +59,15 @@ def run_setup():
         print(" [✓] Created 'config.properties' from example template.")
     else:
         print(" [✓] 'config.properties' exists.")
+
+    # Plex Local .env Setup
+    plex_env = os.path.join(base_dir, "services", "plex", ".env")
+    plex_env_example = os.path.join(base_dir, "services", "plex", ".env.example")
+    if not os.path.exists(plex_env) and os.path.exists(plex_env_example):
+        shutil.copyfile(plex_env_example, plex_env)
+        print(" [✓] Created 'services/plex/.env' local config from template.")
+    else:
+        print(" [✓] 'services/plex/.env' exists.")
 
     # 4. Slskd Default Config Setup
     slskd_config = os.path.join(base_dir, "services", "tools", "slskd", "config", "slskd.yml")

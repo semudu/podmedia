@@ -17,8 +17,12 @@
 *.yaml
 !services/**/podman-compose.yml
 
-# Local configuration files
+# Local environment & properties files
 config.properties
+.env
+**/.env
+**/.env.local
+!**/.env.example
 
 # Python cache & virtual environments
 __pycache__/
