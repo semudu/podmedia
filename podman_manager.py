@@ -127,7 +127,7 @@ def apply_target_state(target_containers):
     if res.returncode == 0:
         for c in res.stdout.strip().splitlines():
             c = c.strip()
-            if c and c != 'media_center_homepage' and c not in target_containers:
+            if c and c not in target_containers:
                 yield f"[-] Stopping untargeted container: {c}...\n"
                 for log in run_command_generator(f'podman stop {c}'):
                     yield log
