@@ -184,13 +184,26 @@ class AppHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
+import threading
+
 def run():
     server_address = ('0.0.0.0', PORT)
     httpd = AppHTTPServer(server_address, AppHandler)
+    
+    server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    server_thread.start()
+
     print(f"==================================================")
-    print(f" PodMedia App running at http://localhost:{PORT}")
+    print(f" 🍿 PodMedia App running at http://localhost:{PORT}")
     print(f"==================================================")
-    httpd.serve_forever()
+
+    try:
+        import tray
+        app_tray = tray.PodMediaTrayApp(PORT, on_quit_callback=lambda: httpd.shutdown())
+        app_tray.run()
+    except Exception as e:
+        print("Running in headless console mode (System Tray disabled):", e)
+        server_thread.join()
 
 if __name__ == '__main__':
     run()

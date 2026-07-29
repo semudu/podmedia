@@ -30,7 +30,7 @@ def run_setup():
     print(BANNER)
     base_dir = os.path.dirname(os.path.abspath(__file__))
 
-    # 1. Dependency Checks
+    # 1. Dependency Checks & Installation
     print("[1/5] Checking Dependencies...")
     if not check_command("podman"):
         print(" [X] ERROR: 'podman' CLI is not installed or not in PATH.")
@@ -39,11 +39,14 @@ def run_setup():
     else:
         print(" [✓] Podman CLI detected.")
 
-    if not check_command("podman-compose"):
-        print(" [!] WARNING: 'podman-compose' CLI not found on PATH.")
-        print("     You can install it via: pip install podman-compose")
-    else:
-        print(" [✓] podman-compose detected.")
+    req_file = os.path.join(base_dir, "requirements.txt")
+    if os.path.exists(req_file):
+        try:
+            print(" [i] Installing/Verifying Python requirements (pystray, Pillow, podman-compose)...")
+            subprocess.run([sys.executable, "-m", "pip", "install", "-r", req_file], check=True, capture_output=True)
+            print(" [✓] Python dependencies verified.")
+        except Exception as e:
+            print(" [!] Note: pip install completed with notice:", e)
 
     # 2. Config & Environment Initialization
     print("\n[2/5] Initializing Personalized Service Configurations...")
@@ -122,7 +125,7 @@ def run_setup():
     print("\n[5/5] Setup Finished!")
     print("==================================================")
     print(" 🎉 PodMedia Dynamic Setup is Complete!")
-    print(" Run 'python app.py' to launch the web dashboard.")
+    print(" Run 'python app.py' to launch the System Tray App.")
     print("==================================================")
 
 if __name__ == "__main__":
