@@ -260,6 +260,12 @@ def start_single_app(app_name):
         work_dir = os.path.join(project_root, 'services', folder)
         for log in run_command_generator(f'podman-compose up -d {service}', cwd=work_dir):
             yield log
+        if app_name == 'plex':
+            try:
+                import media_watcher
+                media_watcher.trigger_plex_full_scan_on_startup()
+            except Exception:
+                pass
         yield f"\n[✓] '{app_name.upper()}' STARTED SUCCESSFULLY!\n"
     else:
         yield f"[X] Unknown service: {app_name}\n"

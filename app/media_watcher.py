@@ -123,6 +123,9 @@ class MediaWatcher(threading.Thread):
             pass
 
     def run(self):
+        # Trigger a full scan of all Plex libraries on startup
+        trigger_plex_full_scan_on_startup()
+
         for cat, path in self.target_folders.items():
             self.snapshots[cat] = self.get_folder_snapshot(path)
 
@@ -139,6 +142,24 @@ class MediaWatcher(threading.Thread):
 
     def stop(self):
         self.running = False
+
+def trigger_plex_full_scan_on_startup():
+    """Waits asynchronously for Plex Web server startup, then triggers a full scan of all libraries."""
+    def _worker():
+        for _ in range(15):
+            time.sleep(2)
+            try:
+                url = "http://localhost:32400/library/sections/all/refresh"
+                req = urllib.request.Request(url)
+                with urllib.request.urlopen(req, timeout=3) as resp:
+                    if resp.status == 200:
+                        print("🚀 [Plex Startup] Triggered full library scan for all sections on Plex startup.")
+                        return
+            except Exception:
+                pass
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
 
 watcher_instance = None
 
