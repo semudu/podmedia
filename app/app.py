@@ -212,54 +212,64 @@ def start_music_folder_watcher(debounce_seconds=4):
     Triggers organize_music() automatically when new files arrive and settle."""
     def _get_dir_state(target_dir):
         if not os.path.exists(target_dir):
-            return (0, 0)
+            return (0, 0, 0, False)
         total_files = 0
+        total_bytes = 0
         latest_mtime = 0
+        is_locked = False
+        now = time.time()
         try:
-            for root, _, files in os.walk(target_dir):
+            for root, dirs, files in os.walk(target_dir):
                 for f in files:
-                    fp = os.path.join(root, f)
                     total_files += 1
+                    fp = os.path.join(root, f)
                     try:
-                        mtime = os.path.getmtime(fp)
-                        if mtime > latest_mtime:
-                            latest_mtime = mtime
+                        stat = os.stat(fp)
+                        total_bytes += stat.st_size
+                        if stat.st_mtime > latest_mtime:
+                            latest_mtime = stat.st_mtime
+                        if now - stat.st_mtime < 60:
+                            try:
+                                with open(fp, 'r+b'):
+                                    pass
+                            except (IOError, OSError):
+                                is_locked = True
                     except Exception:
                         pass
         except Exception:
             pass
-        return (total_files, latest_mtime)
+        return (total_files, total_bytes, latest_mtime, is_locked)
 
     def _worker():
         complete_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(podman_manager.DOWNLOADS_DIR) else os.path.join(podman_manager.DOWNLOADS_DIR, "music", "complete")
         
-        last_files_count, last_mtime = _get_dir_state(complete_dir)
+        last_state = _get_dir_state(complete_dir)
         pending_trigger = False
         last_change_time = 0
 
         while True:
             time.sleep(1)
-            current_count, current_mtime = _get_dir_state(complete_dir)
+            current_state = _get_dir_state(complete_dir)
+            current_count, current_bytes, current_mtime, is_locked = current_state
 
-            # File arrival or modification event detected
-            if current_count > 0 and (current_count != last_files_count or current_mtime != last_mtime):
-                last_files_count = current_count
-                last_mtime = current_mtime
+            # File arrival, size growth, or modification event detected
+            if current_count > 0 and (current_state[:3] != last_state[:3] or is_locked):
+                last_state = current_state
                 last_change_time = time.time()
                 pending_trigger = True
 
-            # If an event occurred and directory state has settled (no new writes for debounce_seconds)
-            if pending_trigger and (time.time() - last_change_time >= debounce_seconds):
+            # Trigger only when file write/copy has settled (no changes and no locks for debounce_seconds)
+            if pending_trigger and not is_locked and (time.time() - last_change_time >= debounce_seconds):
                 pending_trigger = False
                 global is_busy
                 if not is_busy:
-                    print(f"⚡ [Event Watcher] New music detected in complete folder. Triggering Beets auto-tagging...")
+                    print(f"⚡ [Event Watcher] Music copy completed and settled in complete folder. Triggering Beets auto-tagging...")
                     try:
                         for _ in podman_manager.organize_music():
                             pass
                     except Exception as e:
                         print("Music folder watcher execution error:", e)
-                    last_files_count, last_mtime = _get_dir_state(complete_dir)
+                    last_state = _get_dir_state(complete_dir)
 
     t = threading.Thread(target=_worker, daemon=True)
     t.start()

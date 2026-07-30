@@ -5,10 +5,11 @@ import xml.etree.ElementTree as ET
 import urllib.request
 
 class MediaWatcher(threading.Thread):
-    def __init__(self, media_dir, poll_interval=3):
+    def __init__(self, media_dir, poll_interval=3, quiet_seconds=6):
         super().__init__(daemon=True)
         self.media_dir = os.path.abspath(media_dir)
         self.poll_interval = poll_interval
+        self.quiet_seconds = quiet_seconds
         self.running = True
         self.snapshots = {}
         
@@ -19,9 +20,11 @@ class MediaWatcher(threading.Thread):
         }
         
     def get_folder_snapshot(self, path):
+        """Returns (total_files, total_bytes, latest_mtime) for a directory tree."""
         if not os.path.exists(path):
-            return 0, 0
+            return 0, 0, 0
         total_files = 0
+        total_bytes = 0
         latest_mtime = 0
         try:
             for root, dirs, files in os.walk(path):
@@ -29,14 +32,58 @@ class MediaWatcher(threading.Thread):
                     total_files += 1
                     fp = os.path.join(root, f)
                     try:
-                        mtime = os.path.getmtime(fp)
-                        if mtime > latest_mtime:
-                            latest_mtime = mtime
+                        stat = os.stat(fp)
+                        total_bytes += stat.st_size
+                        if stat.st_mtime > latest_mtime:
+                            latest_mtime = stat.st_mtime
                     except Exception:
                         pass
         except Exception:
             pass
-        return total_files, latest_mtime
+        return total_files, total_bytes, latest_mtime
+
+    def is_any_file_locked(self, path):
+        """Checks if any file modified in the last 60 seconds is still open/locked for writing."""
+        if not os.path.exists(path):
+            return False
+        now = time.time()
+        try:
+            for root, dirs, files in os.walk(path):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    try:
+                        mtime = os.path.getmtime(fp)
+                        if now - mtime < 60:
+                            # Try opening file to verify it is no longer locked by Windows Explorer/Downloader
+                            with open(fp, 'r+b'):
+                                pass
+                    except (IOError, OSError):
+                        return True  # File is currently locked / being written to
+        except Exception:
+            pass
+        return False
+
+    def wait_for_copy_completion(self, cat, path):
+        """Waits until folder file count, total size, and mtime remain 100% stable with no locks."""
+        print(f"⏳ [MediaWatcher] Change detected in '{cat}' ({path}). Waiting for file copy/write to complete...")
+        last_snap = self.get_folder_snapshot(path)
+        stable_start = time.time()
+        
+        while self.running:
+            time.sleep(2)
+            current_snap = self.get_folder_snapshot(path)
+            locked = self.is_any_file_locked(path)
+            
+            if current_snap != last_snap or locked:
+                # Active file copy or write still in progress! Reset quiet timer
+                last_snap = current_snap
+                stable_start = time.time()
+            else:
+                # No new file writes or size changes detected
+                elapsed = time.time() - stable_start
+                if elapsed >= self.quiet_seconds:
+                    print(f"✓ [MediaWatcher] Copy/write settled for '{cat}' library ({current_snap[0]} files, {current_snap[1]} bytes).")
+                    return current_snap
 
     def get_plex_section_mapping(self):
         mapping = {}
@@ -83,12 +130,11 @@ class MediaWatcher(threading.Thread):
             time.sleep(self.poll_interval)
             for cat, path in self.target_folders.items():
                 current_snapshot = self.get_folder_snapshot(path)
-                last_snapshot = self.snapshots.get(cat, (0, 0))
+                last_snapshot = self.snapshots.get(cat, (0, 0, 0))
                 
                 if current_snapshot != last_snapshot:
-                    time.sleep(2)
-                    self.snapshots[cat] = self.get_folder_snapshot(path)
-                    print(f"[MediaWatcher] Change detected in '{cat}' library ({last_snapshot} -> {self.snapshots[cat]}). Refreshing Plex section...")
+                    settled_snapshot = self.wait_for_copy_completion(cat, path)
+                    self.snapshots[cat] = settled_snapshot
                     self.trigger_plex_refresh(cat)
 
     def stop(self):
@@ -101,7 +147,7 @@ def start_media_watcher(media_dir):
     if watcher_instance is None or not watcher_instance.is_alive():
         watcher_instance = MediaWatcher(media_dir)
         watcher_instance.start()
-        print(f"[MediaWatcher] Started background watcher for {media_dir} (Movies, Series, Music).")
+        print(f"[MediaWatcher] Started copy-completion background watcher for {media_dir} (Movies, Series, Music).")
 
 def stop_media_watcher():
     global watcher_instance
