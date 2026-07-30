@@ -14,7 +14,7 @@ program=
 [BitTorrent]
 Session\AddTorrentStopped=false
 Session\AlternativeGlobalDLSpeedLimit=500
-Session\DefaultSavePath=/downloads/movies/
+Session\DefaultSavePath=/downloads/movies/complete/
 Session\ExcludedFileNames=
 Session\GlobalMaxInactiveSeedingMinutes=10
 Session\GlobalMaxSeedingMinutes=10
@@ -23,7 +23,7 @@ Session\Port=6881
 Session\QueueingSystemEnabled=false
 Session\SSL\Port=7103
 Session\ShareLimitAction=Stop
-Session\TempPath=/downloads/movies/
+Session\TempPath=/downloads/movies/incomplete/
 Session\UseAlternativeGlobalSpeedLimit=false
 
 [Core]
@@ -45,8 +45,8 @@ Proxy\Profiles\RSS=true
 [Preferences]
 Connection\PortRangeMin=6881
 Connection\UPnP=false
-Downloads\SavePath=/downloads/movies/
-Downloads\TempPath=/downloads/movies/
+Downloads\SavePath=/downloads/movies/complete/
+Downloads\TempPath=/downloads/movies/incomplete/
 General\Locale=en
 MailNotification\req_auth=true
 WebUI\Address=*
@@ -59,4 +59,4 @@ WebUI\ServerDomains=*
 
 [RSS]
 AutoDownloader\DownloadRepacks=true
-AutoDownloader\SmartEpisodeFilter=s(\\d+)e(\\d+), (\\d+)x(\\d+), "(\\d{4}[.\\-]\\d{1,2}[.\\-]\\d{1,2})", "(\\d{1,2}[.\\-]\\d{1,2}[.\\-]\\d{4})"
+AutoDownloader\SmartEpisodeFilter=s(\\d+)e(\\d+), (\\d+)x(\\d+), "(\\d{4}[.\\-]\\d{1,2}[.\\-]\\d{4})", "(\\d{1,2}[.\\-]\\d{1,2}[.\\-]\\d{4})"
