@@ -32,7 +32,7 @@ services:
       - TZ=${TZ:-Europe/Istanbul}
     volumes:
       - ./sonarr/config:/config:Z
-      - ${MEDIA_DIR:-../../media}/tv:/tv:Z
+      - ${MEDIA_DIR:-../../media}/series:/series:Z
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "8989:8989"

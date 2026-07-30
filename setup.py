@@ -94,6 +94,20 @@ def run_setup():
         "qBittorrent Client (services/tools/qbittorrent/config/qBittorrent/qBittorrent.conf)"
     )
 
+    # Sonarr Config (Series Management)
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "tools", "sonarr", "config.xml.example"),
+        os.path.join(base_dir, "services", "tools", "sonarr", "config", "config.xml"),
+        "Sonarr Series Management (services/tools/sonarr/config/config.xml)"
+    )
+
+    # Radarr Config (Movies Management)
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "tools", "radarr", "config.xml.example"),
+        os.path.join(base_dir, "services", "tools", "radarr", "config", "config.xml"),
+        "Radarr Movies Management (services/tools/radarr/config/config.xml)"
+    )
+
     # 3. Dynamic Directory Creation Based on config.properties
     print("\n[3/5] Creating Dynamic Directory & Pipeline Structure...")
     print(f" [i] Active Media Directory    : {media_dir}")
@@ -102,16 +116,18 @@ def run_setup():
     directories = [
         os.path.join(downloads_dir, "music", "incomplete"),
         os.path.join(downloads_dir, "music", "complete"),
-        os.path.join(downloads_dir, "tv", "incomplete"),
-        os.path.join(downloads_dir, "tv", "complete"),
+        os.path.join(downloads_dir, "series", "incomplete"),
+        os.path.join(downloads_dir, "series", "complete"),
         os.path.join(downloads_dir, "movies", "incomplete"),
         os.path.join(downloads_dir, "movies", "complete"),
         os.path.join(media_dir, "movies"),
-        os.path.join(media_dir, "tv"),
+        os.path.join(media_dir, "series"),
         os.path.join(media_dir, "music"),
         os.path.join(base_dir, "services", "tools", "slskd", "config"),
         os.path.join(base_dir, "services", "tools", "beets", "config"),
         os.path.join(base_dir, "services", "tools", "qbittorrent", "config", "qBittorrent"),
+        os.path.join(base_dir, "services", "tools", "sonarr", "config"),
+        os.path.join(base_dir, "services", "tools", "radarr", "config"),
     ]
 
     for d in directories:
