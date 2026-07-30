@@ -7,6 +7,8 @@ if sys.stderr is None:
     sys.stderr = open(os.devnull, 'w')
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
+import threading
+import time
 import urllib.parse
 import json
 
@@ -205,6 +207,24 @@ def is_port_in_use(port):
     except Exception:
         return False
 
+def start_periodic_music_tagger(interval_seconds=300):
+    """Background daemon thread that periodically triggers music auto-tagging and folder cleanup."""
+    def _worker():
+        while True:
+            time.sleep(interval_seconds)
+            try:
+                global is_busy
+                if not is_busy:
+                    complete_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(podman_manager.DOWNLOADS_DIR) else os.path.join(podman_manager.DOWNLOADS_DIR, "music", "complete")
+                    if os.path.exists(complete_dir) and any(os.scandir(complete_dir)):
+                        for _ in podman_manager.organize_music():
+                            pass
+            except Exception as e:
+                print("Periodic music auto-tagger notice:", e)
+
+    t = threading.Thread(target=_worker, daemon=True)
+    t.start()
+
 def run():
     if is_port_in_use(PORT):
         print(f"[i] PodMedia is already running on http://localhost:{PORT}")
@@ -220,6 +240,9 @@ def run():
     
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
+
+    # Start periodic music auto-tagging daemon (scans every 5 minutes)
+    start_periodic_music_tagger(300)
 
     print(f"==================================================")
     print(f" 🍿 PodMedia App running at http://localhost:{PORT}")

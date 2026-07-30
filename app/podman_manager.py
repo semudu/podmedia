@@ -186,8 +186,24 @@ def stop_all_containers():
                     yield log
     yield "\n[✓] ALL SERVICES STOPPED!\n"
 
+def cleanup_empty_dirs(target_dir):
+    """Recursively removes empty folders in target_dir."""
+    if not os.path.exists(target_dir):
+        return 0
+    removed_count = 0
+    for root, dirs, files in os.walk(target_dir, topdown=False):
+        for d in dirs:
+            dir_path = os.path.join(root, d)
+            try:
+                if not os.listdir(dir_path):
+                    os.rmdir(dir_path)
+                    removed_count += 1
+            except Exception:
+                pass
+    return removed_count
+
 def organize_music():
-    """Triggers Beets music auto-tagging process."""
+    """Triggers Beets music auto-tagging process from /downloads/music/complete -> /music."""
     for log in ensure_podman_machine():
         yield log
 
@@ -198,9 +214,18 @@ def organize_music():
         for log in run_command_generator('podman-compose up -d beets', cwd=tools_dir):
             yield log
 
-    yield "[+] Triggering Beets music tagging automation (/downloads/music -> /music)...\n"
-    for log in run_command_generator('podman exec media_center_beets beet import -q /downloads/music'):
+    yield "[+] Triggering Beets music tagging automation (/downloads/music/complete -> /music)...\n"
+    for log in run_command_generator('podman exec media_center_beets beet import -q /downloads/music/complete'):
         yield log
+
+    complete_dir = os.path.abspath(os.path.join(project_root, DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(DOWNLOADS_DIR) else os.path.join(DOWNLOADS_DIR, "music", "complete")
+    incomplete_dir = os.path.abspath(os.path.join(project_root, DOWNLOADS_DIR, "music", "incomplete")) if not os.path.isabs(DOWNLOADS_DIR) else os.path.join(DOWNLOADS_DIR, "music", "incomplete")
+    cleaned_c = cleanup_empty_dirs(complete_dir)
+    cleaned_i = cleanup_empty_dirs(incomplete_dir)
+    total_cleaned = cleaned_c + cleaned_i
+    if total_cleaned > 0:
+        yield f"[✓] Cleaned up {total_cleaned} empty leftover user folder(s).\n"
+
     yield "\n[✓] MUSIC TAGGING COMPLETED!\n"
 
 def start_single_app(app_name):

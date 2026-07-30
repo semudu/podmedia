@@ -15,5 +15,5 @@ shares:
     - /music
 
 directories:
-  incomplete: /downloads/incomplete
-  downloads: /downloads/music
+  incomplete: /downloads/music/incomplete
+  downloads: /downloads/music/complete

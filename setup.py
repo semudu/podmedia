@@ -100,8 +100,10 @@ def run_setup():
     print(f" [i] Active Downloads Directory: {downloads_dir}")
 
     directories = [
-        os.path.join(downloads_dir, "incomplete"),
-        os.path.join(downloads_dir, "music"),
+        os.path.join(downloads_dir, "music", "incomplete"),
+        os.path.join(downloads_dir, "music", "complete"),
+        os.path.join(downloads_dir, "tv"),
+        os.path.join(downloads_dir, "movies"),
         os.path.join(media_dir, "movies"),
         os.path.join(media_dir, "tv"),
         os.path.join(media_dir, "music"),
