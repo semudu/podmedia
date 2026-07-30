@@ -8,6 +8,7 @@ import:
   autotag: true
   quiet: true
   fallback: asis
+  none_rec_action: asis
   timid: false
   log: /config/beets.log
 

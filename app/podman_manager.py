@@ -217,6 +217,9 @@ def organize_music():
     yield "[+] Triggering Beets music tagging automation (/downloads/music/complete -> /music)...\n"
     for log in run_command_generator('podman exec media_center_beets beet import -m -q /downloads/music/complete'):
         yield log
+    # Fallback pass for non-standard folder names or unindexed releases
+    for log in run_command_generator('podman exec media_center_beets beet import -m -A -q /downloads/music/complete'):
+        yield log
 
     complete_dir = os.path.abspath(os.path.join(project_root, DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(DOWNLOADS_DIR) else os.path.join(DOWNLOADS_DIR, "music", "complete")
     incomplete_dir = os.path.abspath(os.path.join(project_root, DOWNLOADS_DIR, "music", "incomplete")) if not os.path.isabs(DOWNLOADS_DIR) else os.path.join(DOWNLOADS_DIR, "music", "incomplete")
