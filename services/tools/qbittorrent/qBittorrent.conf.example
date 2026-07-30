@@ -14,7 +14,8 @@ program=
 [BitTorrent]
 Session\AddTorrentStopped=false
 Session\AlternativeGlobalDLSpeedLimit=500
-Session\DefaultSavePath=/downloads/movies/complete/
+Session\Categories="{\"prowlarr\":{\"name\":\"prowlarr\",\"save_path\":\"\"},\"radarr\":{\"name\":\"radarr\",\"save_path\":\"/downloads/movies/complete\"},\"series\":{\"name\":\"series\",\"save_path\":\"/downloads/series/complete\"},\"sonarr\":{\"name\":\"sonarr\",\"save_path\":\"/downloads/series/complete\"},\"tv-sonarr\":{\"name\":\"tv-sonarr\",\"save_path\":\"/downloads/series/complete\"}}"
+Session\DefaultSavePath=/downloads/
 Session\ExcludedFileNames=
 Session\GlobalMaxInactiveSeedingMinutes=10
 Session\GlobalMaxSeedingMinutes=10
@@ -23,8 +24,15 @@ Session\Port=6881
 Session\QueueingSystemEnabled=false
 Session\SSL\Port=7103
 Session\ShareLimitAction=Stop
-Session\TempPath=/downloads/movies/incomplete/
+Session\TempPath=/downloads/
 Session\UseAlternativeGlobalSpeedLimit=false
+
+[Categories]
+prowlarr\save_path=
+radarr\save_path=/downloads/movies/complete
+series\save_path=/downloads/series/complete
+sonarr\save_path=/downloads/series/complete
+tv-sonarr\save_path=/downloads/series/complete
 
 [Core]
 AutoDeleteAddedTorrentFile=Never
@@ -45,8 +53,8 @@ Proxy\Profiles\RSS=true
 [Preferences]
 Connection\PortRangeMin=6881
 Connection\UPnP=false
-Downloads\SavePath=/downloads/movies/complete/
-Downloads\TempPath=/downloads/movies/incomplete/
+Downloads\SavePath=/downloads/
+Downloads\TempPath=/downloads/
 General\Locale=en
 MailNotification\req_auth=true
 WebUI\Address=*
