@@ -226,6 +226,14 @@ def organize_music():
     if total_cleaned > 0:
         yield f"[✓] Cleaned up {total_cleaned} empty leftover user folder(s).\n"
 
+    # Trigger Plex library refresh if Plex is running
+    try:
+        req = urllib.request.Request("http://localhost:32400/library/sections/all/refresh")
+        urllib.request.urlopen(req, timeout=2)
+        yield "[✓] Triggered automatic Plex Media Library scan.\n"
+    except Exception:
+        pass
+
     yield "\n[✓] MUSIC TAGGING COMPLETED!\n"
 
 def start_single_app(app_name):
