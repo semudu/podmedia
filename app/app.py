@@ -283,6 +283,11 @@ def run():
     # Start event-driven music folder watcher (debounced 4-second file arrival observer)
     start_music_folder_watcher(debounce_seconds=4)
 
+    # Start granular media folder watcher for Plex section refreshes (movies, series, music)
+    import media_watcher
+    media_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.MEDIA_DIR)) if not os.path.isabs(podman_manager.MEDIA_DIR) else podman_manager.MEDIA_DIR
+    media_watcher.start_media_watcher(media_dir)
+
     print(f"==================================================")
     print(f" 🍿 PodMedia App running at http://localhost:{PORT}")
     print(f"==================================================")
