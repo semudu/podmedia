@@ -116,10 +116,8 @@ def run_setup():
     directories = [
         os.path.join(downloads_dir, "music", "incomplete"),
         os.path.join(downloads_dir, "music", "complete"),
-        os.path.join(downloads_dir, "series", "incomplete"),
-        os.path.join(downloads_dir, "series", "complete"),
-        os.path.join(downloads_dir, "movies", "incomplete"),
-        os.path.join(downloads_dir, "movies", "complete"),
+        os.path.join(downloads_dir, "series"),
+        os.path.join(downloads_dir, "movies"),
         os.path.join(media_dir, "movies"),
         os.path.join(media_dir, "series"),
         os.path.join(media_dir, "music"),

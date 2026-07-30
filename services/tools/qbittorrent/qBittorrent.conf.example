@@ -14,7 +14,7 @@ program=
 [BitTorrent]
 Session\AddTorrentStopped=false
 Session\AlternativeGlobalDLSpeedLimit=500
-Session\Categories="{\"prowlarr\":{\"name\":\"prowlarr\",\"save_path\":\"\"},\"radarr\":{\"name\":\"radarr\",\"save_path\":\"/downloads/movies/complete\"},\"series\":{\"name\":\"series\",\"save_path\":\"/downloads/series/complete\"},\"sonarr\":{\"name\":\"sonarr\",\"save_path\":\"/downloads/series/complete\"},\"tv-sonarr\":{\"name\":\"tv-sonarr\",\"save_path\":\"/downloads/series/complete\"}}"
+Session\Categories="{\"prowlarr\":{\"name\":\"prowlarr\",\"save_path\":\"\"},\"radarr\":{\"name\":\"radarr\",\"save_path\":\"/downloads/movies\"},\"series\":{\"name\":\"series\",\"save_path\":\"/downloads/series\"},\"sonarr\":{\"name\":\"sonarr\",\"save_path\":\"/downloads/series\"},\"tv-sonarr\":{\"name\":\"tv-sonarr\",\"save_path\":\"/downloads/series\"}}"
 Session\DefaultSavePath=/downloads/
 Session\ExcludedFileNames=
 Session\GlobalMaxInactiveSeedingMinutes=10
@@ -29,10 +29,10 @@ Session\UseAlternativeGlobalSpeedLimit=false
 
 [Categories]
 prowlarr\save_path=
-radarr\save_path=/downloads/movies/complete
-series\save_path=/downloads/series/complete
-sonarr\save_path=/downloads/series/complete
-tv-sonarr\save_path=/downloads/series/complete
+radarr\save_path=/downloads/movies
+series\save_path=/downloads/series
+sonarr\save_path=/downloads/series
+tv-sonarr\save_path=/downloads/series
 
 [Core]
 AutoDeleteAddedTorrentFile=Never
