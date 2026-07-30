@@ -207,20 +207,59 @@ def is_port_in_use(port):
     except Exception:
         return False
 
-def start_periodic_music_tagger(interval_seconds=300):
-    """Background daemon thread that periodically triggers music auto-tagging and folder cleanup."""
+def start_music_folder_watcher(debounce_seconds=4):
+    """Event-driven folder watcher for downloads/music/complete.
+    Triggers organize_music() automatically when new files arrive and settle."""
+    def _get_dir_state(target_dir):
+        if not os.path.exists(target_dir):
+            return (0, 0)
+        total_files = 0
+        latest_mtime = 0
+        try:
+            for root, _, files in os.walk(target_dir):
+                for f in files:
+                    fp = os.path.join(root, f)
+                    total_files += 1
+                    try:
+                        mtime = os.path.getmtime(fp)
+                        if mtime > latest_mtime:
+                            latest_mtime = mtime
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+        return (total_files, latest_mtime)
+
     def _worker():
+        complete_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(podman_manager.DOWNLOADS_DIR) else os.path.join(podman_manager.DOWNLOADS_DIR, "music", "complete")
+        
+        last_files_count, last_mtime = _get_dir_state(complete_dir)
+        pending_trigger = False
+        last_change_time = 0
+
         while True:
-            time.sleep(interval_seconds)
-            try:
+            time.sleep(1)
+            current_count, current_mtime = _get_dir_state(complete_dir)
+
+            # File arrival or modification event detected
+            if current_count > 0 and (current_count != last_files_count or current_mtime != last_mtime):
+                last_files_count = current_count
+                last_mtime = current_mtime
+                last_change_time = time.time()
+                pending_trigger = True
+
+            # If an event occurred and directory state has settled (no new writes for debounce_seconds)
+            if pending_trigger and (time.time() - last_change_time >= debounce_seconds):
+                pending_trigger = False
                 global is_busy
                 if not is_busy:
-                    complete_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(podman_manager.DOWNLOADS_DIR) else os.path.join(podman_manager.DOWNLOADS_DIR, "music", "complete")
-                    if os.path.exists(complete_dir) and any(os.scandir(complete_dir)):
+                    print(f"⚡ [Event Watcher] New music detected in complete folder. Triggering Beets auto-tagging...")
+                    try:
                         for _ in podman_manager.organize_music():
                             pass
-            except Exception as e:
-                print("Periodic music auto-tagger notice:", e)
+                    except Exception as e:
+                        print("Music folder watcher execution error:", e)
+                    last_files_count, last_mtime = _get_dir_state(complete_dir)
 
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
@@ -241,8 +280,8 @@ def run():
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
 
-    # Start periodic music auto-tagging daemon (scans every 5 minutes)
-    start_periodic_music_tagger(300)
+    # Start event-driven music folder watcher (debounced 4-second file arrival observer)
+    start_music_folder_watcher(debounce_seconds=4)
 
     print(f"==================================================")
     print(f" 🍿 PodMedia App running at http://localhost:{PORT}")
