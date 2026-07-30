@@ -14,7 +14,7 @@ program=
 [BitTorrent]
 Session\AddTorrentStopped=false
 Session\AlternativeGlobalDLSpeedLimit=500
-Session\DefaultSavePath=/downloads/
+Session\DefaultSavePath=/downloads/movies/
 Session\ExcludedFileNames=
 Session\GlobalMaxInactiveSeedingMinutes=10
 Session\GlobalMaxSeedingMinutes=10
@@ -23,7 +23,7 @@ Session\Port=6881
 Session\QueueingSystemEnabled=false
 Session\SSL\Port=7103
 Session\ShareLimitAction=Stop
-Session\TempPath=/downloads/incomplete/
+Session\TempPath=/downloads/movies/
 Session\UseAlternativeGlobalSpeedLimit=false
 
 [Core]
@@ -45,8 +45,8 @@ Proxy\Profiles\RSS=true
 [Preferences]
 Connection\PortRangeMin=6881
 Connection\UPnP=false
-Downloads\SavePath=/downloads/
-Downloads\TempPath=/downloads/incomplete/
+Downloads\SavePath=/downloads/movies/
+Downloads\TempPath=/downloads/movies/
 General\Locale=en
 MailNotification\req_auth=true
 WebUI\Address=*
