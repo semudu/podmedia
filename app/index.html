@@ -424,7 +424,7 @@
                 <div class="card-info">
                     <div class="card-title">Plex Server</div>
                     <div class="status-badge" id="app-plex-badge"><span class="status-dot"></span><span id="app-plex-text">...</span></div>
-                    <a href="http://localhost:32400/web" target="_blank" class="link-btn">Open Web UI ↗</a>
+                    <a href="#" data-port="32400" data-path="/web" target="_blank" class="link-btn">Open Web UI ↗</a>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="app-plex-toggle" onchange="triggerAction('toggle-app', 'plex')">
@@ -437,7 +437,7 @@
                 <div class="card-info">
                     <div class="card-title">Radarr (Movies)</div>
                     <div class="status-badge" id="app-radarr-badge"><span class="status-dot"></span><span id="app-radarr-text">...</span></div>
-                    <a href="http://localhost:7878" target="_blank" class="link-btn">Open Web UI ↗</a>
+                    <a href="#" data-port="7878" target="_blank" class="link-btn">Open Web UI ↗</a>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="app-radarr-toggle" onchange="triggerAction('toggle-app', 'radarr')">
@@ -450,7 +450,7 @@
                 <div class="card-info">
                     <div class="card-title">Sonarr (TV Shows)</div>
                     <div class="status-badge" id="app-sonarr-badge"><span class="status-dot"></span><span id="app-sonarr-text">...</span></div>
-                    <a href="http://localhost:8989" target="_blank" class="link-btn">Open Web UI ↗</a>
+                    <a href="#" data-port="8989" target="_blank" class="link-btn">Open Web UI ↗</a>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="app-sonarr-toggle" onchange="triggerAction('toggle-app', 'sonarr')">
@@ -463,7 +463,7 @@
                 <div class="card-info">
                     <div class="card-title">qBittorrent</div>
                     <div class="status-badge" id="app-qbittorrent-badge"><span class="status-dot"></span><span id="app-qbittorrent-text">...</span></div>
-                    <a href="http://localhost:8080" target="_blank" class="link-btn">Open Web UI ↗</a>
+                    <a href="#" data-port="8080" target="_blank" class="link-btn">Open Web UI ↗</a>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="app-qbittorrent-toggle" onchange="triggerAction('toggle-app', 'qbittorrent')">
@@ -476,7 +476,7 @@
                 <div class="card-info">
                     <div class="card-title">Prowlarr</div>
                     <div class="status-badge" id="app-prowlarr-badge"><span class="status-dot"></span><span id="app-prowlarr-text">...</span></div>
-                    <a href="http://localhost:9696" target="_blank" class="link-btn">Open Web UI ↗</a>
+                    <a href="#" data-port="9696" target="_blank" class="link-btn">Open Web UI ↗</a>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="app-prowlarr-toggle" onchange="triggerAction('toggle-app', 'prowlarr')">
@@ -501,7 +501,7 @@
                 <div class="card-info">
                     <div class="card-title">Slskd (FLAC)</div>
                     <div class="status-badge" id="app-slskd-badge"><span class="status-dot"></span><span id="app-slskd-text">...</span></div>
-                    <a href="http://localhost:5030" target="_blank" class="link-btn">Open Web UI ↗</a>
+                    <a href="#" data-port="5030" target="_blank" class="link-btn">Open Web UI ↗</a>
                 </div>
                 <label class="switch">
                     <input type="checkbox" id="app-slskd-toggle" onchange="triggerAction('toggle-app', 'slskd')">
@@ -728,6 +728,16 @@
             };
         }
 
+        function updateDynamicServiceLinks() {
+            const currentHost = window.location.hostname || 'localhost';
+            document.querySelectorAll('.link-btn[data-port]').forEach(btn => {
+                const port = btn.getAttribute('data-port');
+                const path = btn.getAttribute('data-path') || '';
+                btn.href = `http://${currentHost}:${port}${path}`;
+            });
+        }
+
+        updateDynamicServiceLinks();
         fetchStatus();
         setInterval(fetchStatus, 2000);
     </script>
