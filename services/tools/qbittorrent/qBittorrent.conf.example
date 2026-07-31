@@ -14,7 +14,9 @@ program=
 [BitTorrent]
 Session\AddTorrentStopped=false
 Session\AlternativeGlobalDLSpeedLimit=500
+Session\AutoTMMEnabled=true
 Session\Categories="{\"prowlarr\":{\"name\":\"prowlarr\",\"save_path\":\"\"},\"radarr\":{\"name\":\"radarr\",\"save_path\":\"/downloads/movies\"},\"series\":{\"name\":\"series\",\"save_path\":\"/downloads/series\"},\"sonarr\":{\"name\":\"sonarr\",\"save_path\":\"/downloads/series\"},\"tv-sonarr\":{\"name\":\"tv-sonarr\",\"save_path\":\"/downloads/series\"}}"
+Session\CategoryChangedTarget=true
 Session\DefaultSavePath=/downloads/
 Session\ExcludedFileNames=
 Session\GlobalMaxInactiveSeedingMinutes=10
@@ -53,6 +55,8 @@ Proxy\Profiles\RSS=true
 [Preferences]
 Connection\PortRangeMin=6881
 Connection\UPnP=false
+Downloads\AutoTMMEnabled=true
+Downloads\CategoryChangedTarget=true
 Downloads\SavePath=/downloads/
 Downloads\TempPath=/downloads/
 General\Locale=en
