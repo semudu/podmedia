@@ -47,7 +47,7 @@ def get_action_generator(action, target):
         group_apps_map = {
             'plex': ['plex'],
             'downloads': ['radarr', 'sonarr', 'prowlarr', 'qbittorrent', 'flaresolverr'],
-            'music': ['plex', 'slskd', 'beets']
+            'music': ['plex', 'slskd', 'beets', 'metube']
         }
         app_container_map = {
             'plex': 'media_center_plex',
@@ -57,7 +57,8 @@ def get_action_generator(action, target):
             'qbittorrent': 'media_center_qbittorrent',
             'flaresolverr': 'media_center_flaresolverr',
             'slskd': 'media_center_slskd',
-            'beets': 'media_center_beets'
+            'beets': 'media_center_beets',
+            'metube': 'media_center_metube'
         }
 
         group_apps = group_apps_map.get(group, [])
@@ -94,7 +95,8 @@ def get_action_generator(action, target):
             'qbittorrent': 'media_center_qbittorrent',
             'flaresolverr': 'media_center_flaresolverr',
             'slskd': 'media_center_slskd',
-            'beets': 'media_center_beets'
+            'beets': 'media_center_beets',
+            'metube': 'media_center_metube'
         }
         c_name = app_container_map.get(app)
         if c_name and states.get(c_name, False):
