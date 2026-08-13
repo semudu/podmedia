@@ -509,6 +509,19 @@
                 </label>
             </div>
 
+            <!-- MeTube (YouTube / YouTube Music) -->
+            <div class="card">
+                <div class="card-info">
+                    <div class="card-title">MeTube (YouTube Music)</div>
+                    <div class="status-badge" id="app-metube-badge"><span class="status-dot"></span><span id="app-metube-text">...</span></div>
+                    <a href="#" data-port="8081" target="_blank" class="link-btn">Open Web UI ↗</a>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="app-metube-toggle" onchange="triggerAction('toggle-app', 'metube')">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
             <!-- Beets -->
             <div class="card">
                 <div class="card-info">
@@ -640,6 +653,7 @@
             updateElement('app-flaresolverr', containers.media_center_flaresolverr);
             updateElement('app-slskd', containers.media_center_slskd);
             updateElement('app-beets', containers.media_center_beets);
+            updateElement('app-metube', containers.media_center_metube);
         }
 
         function updateElement(idPrefix, isActive) {

@@ -24,7 +24,8 @@ ALL_CONTAINERS = [
     'media_center_qbittorrent',
     'media_center_flaresolverr',
     'media_center_slskd',
-    'media_center_beets'
+    'media_center_beets',
+    'media_center_metube'
 ]
 
 TOOL_MAP = {
@@ -34,7 +35,8 @@ TOOL_MAP = {
     'media_center_qbittorrent': 'qbittorrent',
     'media_center_flaresolverr': 'flaresolverr',
     'media_center_slskd': 'slskd',
-    'media_center_beets': 'beets'
+    'media_center_beets': 'beets',
+    'media_center_metube': 'metube'
 }
 
 def subproc_kwargs():
@@ -254,7 +256,8 @@ def start_single_app(app_name):
         'qbittorrent': ('tools', 'qbittorrent'),
         'flaresolverr': ('tools', 'flaresolverr'),
         'slskd': ('tools', 'slskd'),
-        'beets': ('tools', 'beets')
+        'beets': ('tools', 'beets'),
+        'metube': ('tools', 'metube')
     }
 
     if app_name in app_map:

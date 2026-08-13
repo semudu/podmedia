@@ -121,3 +121,22 @@ services:
     networks:
       - media_center_net
     restart: unless-stopped
+
+  metube:
+    container_name: media_center_metube
+    image: ghcr.io/alexta69/metube:latest
+    environment:
+      - PUID=1000
+      - PGID=1000
+      - TZ=${TZ:-Europe/Istanbul}
+      - DOWNLOAD_DIR=/downloads
+      - AUDIO_ONLY=true
+      - OUTPUT_TEMPLATE=%(artist,uploader)s - %(title)s.%(ext)s
+    volumes:
+      - ${DOWNLOADS_DIR:-../../downloads}/music/complete:/downloads:Z
+    ports:
+      - "8081:8081"
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
