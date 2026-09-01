@@ -131,9 +131,12 @@ services:
       - TZ=${TZ:-Europe/Istanbul}
       - DOWNLOAD_DIR=/downloads
       - AUDIO_ONLY=true
+      - YTDL_AUTO_UPDATE=true
+      - COOKIES_FILE=/app/cookies/cookies.txt
       - OUTPUT_TEMPLATE=%(artist,uploader)s - %(title)s.%(ext)s
     volumes:
       - ${DOWNLOADS_DIR:-../../downloads}/music/complete:/downloads:Z
+      - ./metube:/app/cookies:Z
     ports:
       - "8081:8081"
     networks:
