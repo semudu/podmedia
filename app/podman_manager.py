@@ -219,6 +219,9 @@ def organize_music():
     yield "[+] Triggering Beets music tagging automation (/downloads/music/complete -> /music)...\n"
     for log in run_command_generator('podman exec media_center_beets beet import -m -q /downloads/music/complete'):
         yield log
+    # Singleton pass for individual songs
+    for log in run_command_generator('podman exec media_center_beets beet import -m -s -q /downloads/music/complete'):
+        yield log
     # Fallback pass for non-standard folder names or unindexed releases
     for log in run_command_generator('podman exec media_center_beets beet import -m -A -q /downloads/music/complete'):
         yield log
