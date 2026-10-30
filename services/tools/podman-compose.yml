@@ -16,7 +16,9 @@ services:
     volumes:
       - ./radarr/config:/config:Z
       - ${MEDIA_DIR:-../../media}/movies:/movies:Z
-      - ${EXTERNAL_MOVIES_DIR:-../../media_external_stub/movies}:/movies_external:Z
+      - type: bind
+        source: ${EXTERNAL_MOVIES_DIR:-../../media_external_stub/movies}
+        target: /movies_external
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "7878:7878"
@@ -35,8 +37,12 @@ services:
       - ./sonarr/config:/config:Z
       - ${MEDIA_DIR:-../../media}/series:/series:Z
       - ${MEDIA_DIR:-../../media}/series:/tv:Z
-      - ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}:/series_external:Z
-      - ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}:/tv_external:Z
+      - type: bind
+        source: ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}
+        target: /series_external
+      - type: bind
+        source: ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}
+        target: /tv_external
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "8989:8989"
