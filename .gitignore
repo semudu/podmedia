@@ -26,9 +26,11 @@ media_external_stub/
 **/.env.local
 !**/.env.example
 
-# Dynamically generated OS Launchers
+# Dynamically generated OS Launchers & Stoppers
 start.bat
 start.sh
+stop.bat
+stop.sh
 
 # Python cache & virtual environments
 __pycache__/
