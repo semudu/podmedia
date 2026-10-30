@@ -182,6 +182,7 @@ def run_setup():
             "    taskkill /F /PID %%a >nul 2>&1\n"
             ")\n"
             "powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*app\\app.py*' -or $_.CommandLine -like '*app/app.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\" >nul 2>&1\n"
+            "powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*DFB65C4C-B34F-435D-AFE9-A86218684AA8*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\" >nul 2>&1\n"
             "echo   [OK] Web sunucusu ve izleme surecleri kapatildi.\n\n"
             "echo.\n"
             "echo ==================================================\n"

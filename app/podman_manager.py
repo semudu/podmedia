@@ -232,10 +232,25 @@ def release_external_mounts():
     try:
         res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, **subproc_kwargs())
         if res.returncode == 0 and not res.stdout.strip():
+            letters = set()
             active_disk = disk_manager.get_active_disk()
             if active_disk and active_disk.get('letter'):
-                letter = active_disk['letter'][0].lower()
-                subprocess.run(['wsl', '-d', 'podman-machine-default', '-u', 'root', 'umount', f'/mnt/{letter}'], capture_output=True, text=True, **subproc_kwargs())
+                letters.add(active_disk['letter'][0].lower())
+            for d in disk_manager.list_available_drives():
+                if d.get('letter'):
+                    letters.add(d['letter'][0].lower())
+            letters.update(['e', 'f', 'g'])
+
+            for l in letters:
+                subprocess.run(['wsl', '-d', 'podman-machine-default', '-u', 'root', 'umount', f'/mnt/{l}'], capture_output=True, text=True, **subproc_kwargs())
+
+            # Also clear any lingering Windows COM Surrogate / DllHost processes that lock external drives after file transfers
+            if os.name == 'nt':
+                subprocess.run(
+                    ['powershell', '-NoProfile', '-Command', 
+                     "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*DFB65C4C-B34F-435D-AFE9-A86218684AA8*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"],
+                    capture_output=True, text=True, **subproc_kwargs()
+                )
     except Exception:
         pass
 
