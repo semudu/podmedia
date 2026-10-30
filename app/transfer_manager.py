@@ -310,3 +310,4 @@ class TransferManager:
 
 # Global singleton instance
 transfer_manager = TransferManager()
+

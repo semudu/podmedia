@@ -15,6 +15,7 @@ import json
 import podman_manager
 import atexit
 from transfer_manager import transfer_manager
+from disk_manager import disk_manager
 
 # Ensure all PodMedia containers are stopped cleanly on application exit
 atexit.register(podman_manager.stop_all_containers_sync)
@@ -168,8 +169,12 @@ class AppHandler(BaseHTTPRequestHandler):
             })
 
         elif path == '/api/transfer/start':
+            ext_disk = podman_manager.get_external_disk_info()
+            if not ext_disk.get("connected"):
+                self.send_json({"status": "error", "message": "Harici disk bağlı veya tanımlı değil!"})
+                return
             local_media = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.MEDIA_DIR)) if not os.path.isabs(podman_manager.MEDIA_DIR) else podman_manager.MEDIA_DIR
-            target_ext = podman_manager.EXTERNAL_MEDIA_DIR
+            target_ext = podman_manager.get_external_media_dir()
             res = transfer_manager.start_transfer(local_media, target_ext, categories=("movies", "series"))
             self.send_json(res)
 
@@ -178,6 +183,25 @@ class AppHandler(BaseHTTPRequestHandler):
             mode = query.get('mode', ['immediate'])[0]
             res = transfer_manager.stop_transfer(mode=mode)
             self.send_json(res)
+
+        elif path == '/api/disks/list':
+            drives = disk_manager.list_available_drives()
+            active = disk_manager.get_active_disk()
+            self.send_json({
+                "drives": drives,
+                "active": active
+            })
+
+        elif path == '/api/disks/select':
+            query = urllib.parse.parse_qs(parsed.query)
+            drive_letter = query.get('drive', [''])[0]
+            if drive_letter:
+                res = disk_manager.set_target_disk(drive_letter)
+                # Refresh dynamic disk status
+                podman_manager.get_external_disk_info()
+                self.send_json(res)
+            else:
+                self.send_json({"status": "error", "message": "Eksik parametre: drive"}, 400)
 
         elif path == '/api/stream':
             if is_busy:

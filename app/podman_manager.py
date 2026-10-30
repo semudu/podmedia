@@ -48,31 +48,32 @@ def subproc_kwargs():
         kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
     return kwargs
 
+from disk_manager import disk_manager
+
+def get_external_media_dir():
+    """Returns the dynamic media directory path of the active external disk, or configured fallback."""
+    active = disk_manager.get_active_disk()
+    if active and active.get("connected") and active.get("media_path"):
+        return active["media_path"]
+    return EXTERNAL_MEDIA_DIR
+
 def get_external_disk_info():
-    """Returns status and metrics for the external storage drive."""
-    drive_letter = os.path.splitdrive(EXTERNAL_MEDIA_DIR)[0] or 'E:'
-    is_connected = os.path.exists(EXTERNAL_MEDIA_DIR) or os.path.exists(drive_letter + '\\')
+    """Returns dynamic status and metrics for the currently attached target storage drive."""
+    active = disk_manager.get_active_disk()
+    cfg = disk_manager.get_config()
     
     info = {
-        "connected": is_connected,
-        "drive_letter": drive_letter,
-        "path": EXTERNAL_MEDIA_DIR,
-        "free_gb": 0.0,
-        "total_gb": 0.0,
+        "connected": bool(active and active.get("connected")),
+        "drive_letter": active.get("letter", "E:") if active else "E:",
+        "label": active.get("label", cfg.get("target_label", "Harici Disk")) if active else cfg.get("target_label", "Harici Disk"),
+        "serial": active.get("serial", cfg.get("target_serial", "")) if active else cfg.get("target_serial", ""),
+        "path": active.get("media_path", "E:/media") if active else "E:/media",
+        "free_gb": active.get("free_gb", 0.0) if active else 0.0,
+        "total_gb": active.get("total_gb", 0.0) if active else 0.0,
         "pending_movies_gb": 0.0,
         "pending_series_gb": 0.0,
         "total_pending_gb": 0.0
     }
-    
-    if is_connected:
-        try:
-            import shutil
-            target_check = EXTERNAL_MEDIA_DIR if os.path.exists(EXTERNAL_MEDIA_DIR) else (drive_letter + '\\')
-            usage = shutil.disk_usage(target_check)
-            info["free_gb"] = round(usage.free / (1024**3), 1)
-            info["total_gb"] = round(usage.total / (1024**3), 1)
-        except Exception:
-            pass
 
     # Calculate pending files in local D:\media_center\media\movies and series
     local_media = os.path.abspath(os.path.join(project_root, MEDIA_DIR)) if not os.path.isabs(MEDIA_DIR) else MEDIA_DIR
@@ -114,13 +115,13 @@ def run_command_generator(cmd, cwd=None):
         env['MEDIA_DIR'] = resolve_compose_path(MEDIA_DIR, cwd)
         env['DOWNLOADS_DIR'] = resolve_compose_path(DOWNLOADS_DIR, cwd)
 
-        # Dynamic external drive resolution: if external drive is attached, mount it;
-        # otherwise fallback to local empty stub directory so containers start cleanly without error!
-        disk_info = get_external_disk_info()
-        if disk_info["connected"] and os.path.exists(EXTERNAL_MEDIA_DIR):
-            env['EXTERNAL_MEDIA_DIR'] = resolve_compose_path(EXTERNAL_MEDIA_DIR, cwd)
-            env['EXTERNAL_MOVIES_DIR'] = resolve_compose_path(os.path.join(EXTERNAL_MEDIA_DIR, 'movies'), cwd)
-            env['EXTERNAL_SERIES_DIR'] = resolve_compose_path(os.path.join(EXTERNAL_MEDIA_DIR, 'series'), cwd)
+        # Dynamic external drive resolution: find registered drive regardless of current drive letter (E:, F:, Z:)
+        # Fallback to local stub if unmounted so containers start cleanly without error!
+        active_disk = disk_manager.get_active_disk()
+        if active_disk and active_disk["connected"] and os.path.exists(active_disk["media_path"]):
+            env['EXTERNAL_MEDIA_DIR'] = resolve_compose_path(active_disk["media_path"], cwd)
+            env['EXTERNAL_MOVIES_DIR'] = resolve_compose_path(active_disk["movies_path"], cwd)
+            env['EXTERNAL_SERIES_DIR'] = resolve_compose_path(active_disk["series_path"], cwd)
         else:
             stub_abs = os.path.abspath(os.path.join(project_root, MEDIA_STUB_DIR))
             os.makedirs(os.path.join(stub_abs, 'movies'), exist_ok=True)

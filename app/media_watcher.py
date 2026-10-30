@@ -3,6 +3,7 @@ import time
 import threading
 import xml.etree.ElementTree as ET
 import urllib.request
+from disk_manager import disk_manager
 
 class MediaWatcher(threading.Thread):
     def __init__(self, media_dir, poll_interval=3, quiet_seconds=6):
@@ -16,9 +17,7 @@ class MediaWatcher(threading.Thread):
         self.target_folders = {
             'movies': os.path.join(self.media_dir, 'movies'),
             'series': os.path.join(self.media_dir, 'series'),
-            'music': os.path.join(self.media_dir, 'music'),
-            'movies_ext': 'E:\\media\\movies',
-            'series_ext': 'E:\\media\\series'
+            'music': os.path.join(self.media_dir, 'music')
         }
         
     def get_folder_snapshot(self, path):
@@ -131,8 +130,29 @@ class MediaWatcher(threading.Thread):
         for cat, path in self.target_folders.items():
             self.snapshots[cat] = self.get_folder_snapshot(path)
 
+        last_ext_connected = False
+
         while self.running:
             time.sleep(self.poll_interval)
+
+            # Dynamically update external disk paths
+            try:
+                active_disk = disk_manager.get_active_disk()
+                is_ext_connected = bool(active_disk and active_disk.get('connected'))
+                if is_ext_connected:
+                    self.target_folders['movies_ext'] = active_disk['movies_path']
+                    self.target_folders['series_ext'] = active_disk['series_path']
+                    if not last_ext_connected:
+                        print(f"🔌 [MediaWatcher] External disk connected ({active_disk.get('label')}, {active_disk.get('drive')}). Refreshing Plex libraries...")
+                        self.trigger_plex_refresh('movies')
+                        self.trigger_plex_refresh('series')
+                else:
+                    self.target_folders.pop('movies_ext', None)
+                    self.target_folders.pop('series_ext', None)
+                last_ext_connected = is_ext_connected
+            except Exception:
+                pass
+
             for cat, path in list(self.target_folders.items()):
                 if not os.path.exists(path):
                     # Directory is offline / unmounted (e.g. external disk detached)
