@@ -227,8 +227,8 @@ def apply_target_state(target_containers):
     yield "\n[✓] ACTION COMPLETED SUCCESSFULLY!\n"
 
 def release_external_mounts():
-    """Safely unmounts external drive mounts in WSL when no media_center containers are running.
-    This frees Windows file locks so the external disk can be safely ejected or placed in sleep mode."""
+    """Safely unmounts external drive mounts in WSL and flushes volume buffers when no media_center containers are running.
+    This frees Windows file locks generically so any external disk can be safely ejected or placed in sleep mode."""
     try:
         res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, **subproc_kwargs())
         if res.returncode == 0 and not res.stdout.strip():
@@ -242,17 +242,12 @@ def release_external_mounts():
             letters.update(['e', 'f', 'g'])
 
             for l in letters:
+                # 1. Safely unmount inside WSL
                 subprocess.run(['wsl', '-d', 'podman-machine-default', '-u', 'root', 'umount', f'/mnt/{l}'], capture_output=True, text=True, **subproc_kwargs())
-
-            # Also clear any lingering Windows COM Surrogate / DllHost processes that lock external drives after file transfers
-            if os.name == 'nt':
-                subprocess.run(
-                    ['powershell', '-NoProfile', '-Command', 
-                     "Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*DFB65C4C-B34F-435D-AFE9-A86218684AA8*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }"],
-                    capture_output=True, text=True, **subproc_kwargs()
-                )
-    except Exception:
-        pass
+                # 2. Generically release locks & dismount volume in Windows via Restart Manager & FSCTL_DISMOUNT_VOLUME
+                disk_manager.safely_release_drive(l)
+    except Exception as e:
+        print("Error releasing external mounts:", e)
 
 def stop_all_containers_sync():
     """Synchronously stops all running PodMedia containers (used on application exit)."""
