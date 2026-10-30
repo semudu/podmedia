@@ -16,7 +16,9 @@ class MediaWatcher(threading.Thread):
         self.target_folders = {
             'movies': os.path.join(self.media_dir, 'movies'),
             'series': os.path.join(self.media_dir, 'series'),
-            'music': os.path.join(self.media_dir, 'music')
+            'music': os.path.join(self.media_dir, 'music'),
+            'movies_ext': 'E:\\media\\movies',
+            'series_ext': 'E:\\media\\series'
         }
         
     def get_folder_snapshot(self, path):
@@ -131,14 +133,20 @@ class MediaWatcher(threading.Thread):
 
         while self.running:
             time.sleep(self.poll_interval)
-            for cat, path in self.target_folders.items():
+            for cat, path in list(self.target_folders.items()):
+                if not os.path.exists(path):
+                    # Directory is offline / unmounted (e.g. external disk detached)
+                    # Skip without triggering false deletion scan in Plex!
+                    continue
+
                 current_snapshot = self.get_folder_snapshot(path)
                 last_snapshot = self.snapshots.get(cat, (0, 0, 0))
                 
                 if current_snapshot != last_snapshot:
                     settled_snapshot = self.wait_for_copy_completion(cat, path)
                     self.snapshots[cat] = settled_snapshot
-                    self.trigger_plex_refresh(cat)
+                    plex_cat = cat.replace('_ext', '')
+                    self.trigger_plex_refresh(plex_cat)
 
     def stop(self):
         self.running = False

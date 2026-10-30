@@ -350,6 +350,309 @@
             white-space: pre-wrap;
             line-height: 1.5;
         }
+        /* STORAGE BANNER */
+        .storage-banner {
+            background: #1e293b;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px 20px;
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .storage-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .storage-icon {
+            font-size: 2rem;
+            background: #0f172a;
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .storage-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .disk-badge {
+            font-size: 0.75rem;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-weight: 500;
+        }
+
+        .disk-badge.connected {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--accent-green);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .disk-badge.disconnected {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--accent-red);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .storage-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .btn-transfer {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            border: none;
+            padding: 10px 18px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-transfer:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
+        }
+
+        .btn-transfer:disabled {
+            background: #334155;
+            color: #64748b;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        /* FLOATING TRANSFER MINI BAR (Non-blocking) */
+        .transfer-floating {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #0f172a;
+            border: 1px solid #38bdf8;
+            border-radius: 12px;
+            padding: 12px 18px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            z-index: 999;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            animation: slideUp 0.3s ease;
+        }
+
+        .transfer-floating:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(56, 189, 248, 0.25);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        .floating-content {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .floating-spinner {
+            width: 18px;
+            height: 18px;
+            border: 2px solid #38bdf8;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .floating-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .floating-meta {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .btn-float-details {
+            background: #1e293b;
+            color: #38bdf8;
+            border: 1px solid #334155;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        /* TRANSFER MODAL SPECIFIC */
+        .transfer-modal {
+            max-width: 680px;
+            padding: 0;
+        }
+
+        .btn-close-modal {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .btn-close-modal:hover {
+            color: #f1f5f9;
+            background: #1e293b;
+        }
+
+        .transfer-body {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .transfer-section {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .t-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.88rem;
+        }
+
+        .t-label {
+            color: var(--text-muted);
+        }
+
+        .t-val {
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .file-fill {
+            background: #10b981 !important;
+        }
+
+        .t-metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 4px;
+        }
+
+        .t-metric-card {
+            background: #0f172a;
+            border: 1px solid var(--border);
+            padding: 10px 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .t-metric-lbl {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .t-metric-val {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #38bdf8;
+            margin-top: 4px;
+        }
+
+        .t-status-msg {
+            background: #090d16;
+            border: 1px solid var(--border);
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.82rem;
+            color: #94a3b8;
+            white-space: pre-wrap;
+            max-height: 70px;
+            overflow-y: auto;
+        }
+
+        .t-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+        }
+
+        .btn-t-graceful {
+            flex: 1;
+            background: #f59e0b;
+            color: #0f172a;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-t-graceful:hover {
+            background: #d97706;
+        }
+
+        .btn-t-immediate {
+            flex: 1;
+            background: #ef4444;
+            color: white;
+            border: none;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-t-immediate:hover {
+            background: #dc2626;
+        }
+
+        .btn-t-graceful:disabled, .btn-t-immediate:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
     </style>
 </head>
 <body>
@@ -369,6 +672,27 @@
             </button>
         </div>
     </header>
+
+    <!-- EXTERNAL STORAGE & HYBRID ARCHIVE BANNER -->
+    <div class="storage-banner" id="storage-banner">
+        <div class="storage-info">
+            <div class="storage-icon">💾</div>
+            <div>
+                <div class="storage-title">
+                    <span id="disk-status-title">Harici Disk (E:)</span>
+                    <span class="disk-badge" id="disk-badge">Kontrol ediliyor...</span>
+                </div>
+                <div class="storage-meta" id="storage-meta">
+                    Depolama durumu taranıyor...
+                </div>
+            </div>
+        </div>
+        <div class="storage-actions">
+            <button id="transfer-btn" class="btn-transfer" onclick="startTransfer()" disabled>
+                📦 Harici Diske Aktar ve Yer Aç
+            </button>
+        </div>
+    </div>
 
     <!-- PRESET GROUPS -->
     <div class="section">
@@ -551,6 +875,78 @@
         </div>
     </div>
 
+    <!-- FLOATING TRANSFER MINI BAR (Non-blocking) -->
+    <div class="transfer-floating" id="transfer-floating" style="display: none;" onclick="openTransferModal()">
+        <div class="floating-content">
+            <div class="floating-spinner"></div>
+            <div>
+                <div class="floating-title">📦 Harici Diske Aktarılıyor... (<span id="float-percent">0%</span>)</div>
+                <div class="floating-meta"><span id="float-file">...</span> • <span id="float-speed">0 MB/s</span></div>
+            </div>
+        </div>
+        <button class="btn-float-details" onclick="event.stopPropagation(); openTransferModal();">Detaylar ↗</button>
+    </div>
+
+    <!-- DEDICATED TRANSFER PROGRESS & CONTROL MODAL -->
+    <div class="modal-overlay" id="transfer-modal-overlay" style="display: none;">
+        <div class="modal transfer-modal">
+            <div class="modal-header">
+                <div class="modal-title">📦 Harici Diske Veri Aktarımı</div>
+                <button class="btn-close-modal" onclick="closeTransferModal()" title="Arka plana al (Aktarımı durdurmaz)">✕</button>
+            </div>
+            
+            <div class="transfer-body">
+                <div class="transfer-section">
+                    <div class="t-row">
+                        <span class="t-label">Genel İlerleme</span>
+                        <span class="t-val" id="t-overall-text">0 GB / 0 GB (%0)</span>
+                    </div>
+                    <div class="progress-bar-bg" style="height: 8px; border-radius: 4px;">
+                        <div class="progress-bar-fill" id="t-overall-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="transfer-section">
+                    <div class="t-row">
+                        <span class="t-label" style="max-width: 75%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            Mevcut Dosya: <b id="t-current-filename">-</b>
+                        </span>
+                        <span class="t-val" id="t-file-text">0 MB / 0 MB (%0)</span>
+                    </div>
+                    <div class="progress-bar-bg" style="height: 6px; border-radius: 3px;">
+                        <div class="progress-bar-fill file-fill" id="t-file-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+
+                <div class="t-metrics-grid">
+                    <div class="t-metric-card">
+                        <div class="t-metric-lbl">Aktarım Hızı</div>
+                        <div class="t-metric-val" id="t-speed">0 MB/s</div>
+                    </div>
+                    <div class="t-metric-card">
+                        <div class="t-metric-lbl">Tahmini Kalan Süre</div>
+                        <div class="t-metric-val" id="t-eta">-</div>
+                    </div>
+                    <div class="t-metric-card">
+                        <div class="t-metric-lbl">Aktarılan Dosya</div>
+                        <div class="t-metric-val" id="t-files-count">0 / 0</div>
+                    </div>
+                </div>
+
+                <div class="t-status-msg" id="t-status-msg">Hazırlanıyor...</div>
+
+                <div class="t-actions">
+                    <button class="btn-t-graceful" id="btn-t-graceful" onclick="stopTransfer('graceful')">
+                        ⏸️ Kontrollü Durdur (Bu Dosyadan Sonra)
+                    </button>
+                    <button class="btn-t-immediate" id="btn-t-immediate" onclick="stopTransfer('immediate')">
+                        🛑 Hemen Durdur (İptal & Geri Al)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         let isSystemBusy = false;
         let anyRunning = false;
@@ -654,6 +1050,9 @@
             updateElement('app-slskd', containers.media_center_slskd);
             updateElement('app-beets', containers.media_center_beets);
             updateElement('app-metube', containers.media_center_metube);
+
+            // Update External Storage Banner
+            updateStorageBanner(data.external_disk, data.transfer);
         }
 
         function updateElement(idPrefix, isActive) {
@@ -740,6 +1139,183 @@
                     fetchStatus();
                 }, 1500);
             };
+        }
+
+        /* EXTERNAL STORAGE & HYBRID TRANSFER LOGIC */
+        let transferPollTimer = null;
+        let isTransferring = false;
+
+        function updateStorageBanner(disk, transfer) {
+            if (!disk) return;
+
+            const badge = document.getElementById('disk-badge');
+            const meta = document.getElementById('storage-meta');
+            const btn = document.getElementById('transfer-btn');
+            const floating = document.getElementById('transfer-floating');
+
+            if (disk.connected) {
+                badge.className = 'disk-badge connected';
+                badge.innerText = `Bağlı (${disk.free_gb} GB Boş)`;
+
+                if (transfer && transfer.active) {
+                    meta.innerHTML = `Aktarım devam ediyor: <b>${transfer.overall_percent}%</b> (${transfer.speed_mbps} MB/s)`;
+                    btn.disabled = true;
+                    btn.innerHTML = `⏳ Aktarım Sürüyor...`;
+                } else if (disk.total_pending_gb > 0) {
+                    meta.innerHTML = `Yerelde aktarılmayı bekleyen: <b>${disk.total_pending_gb} GB</b> (Film: ${disk.pending_movies_gb} GB, Dizi: ${disk.pending_series_gb} GB)`;
+                    btn.disabled = false;
+                    btn.innerHTML = `📦 Harici Diske Aktar ve Yer Aç (${disk.total_pending_gb} GB)`;
+                } else {
+                    meta.innerHTML = `Yerel disk tertemiz! Tüm film ve diziler harici diskte arşivlenmiş durumda.`;
+                    btn.disabled = true;
+                    btn.innerHTML = `✓ Tüm İçerikler Haricide`;
+                }
+            } else {
+                badge.className = 'disk-badge disconnected';
+                badge.innerText = `Takılı Değil`;
+                meta.innerHTML = `Yerelde ${disk.total_pending_gb} GB film/dizi var. Harici disk takıldığında tek tıkla aktarabilirsiniz.`;
+                btn.disabled = true;
+                btn.innerHTML = `💾 Harici Disk Takılı Değil`;
+            }
+
+            // Sync floating mini bar if active
+            if (transfer && transfer.active) {
+                isTransferring = true;
+                floating.style.display = 'flex';
+                document.getElementById('float-percent').innerText = `${transfer.overall_percent}%`;
+                document.getElementById('float-file').innerText = transfer.current_file || 'Dosya hazırlanıyor';
+                document.getElementById('float-speed').innerText = `${transfer.speed_mbps} MB/s`;
+
+                if (!transferPollTimer) {
+                    transferPollTimer = setInterval(pollTransferStatus, 800);
+                }
+            } else if (!transfer || !transfer.active) {
+                if (isTransferring) {
+                    isTransferring = false;
+                    setTimeout(() => {
+                        floating.style.display = 'none';
+                    }, 2000);
+                }
+            }
+        }
+
+        async function startTransfer() {
+            try {
+                const res = await fetch('/api/transfer/start');
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    openTransferModal();
+                    pollTransferStatus();
+                    if (!transferPollTimer) {
+                        transferPollTimer = setInterval(pollTransferStatus, 800);
+                    }
+                } else {
+                    alert(data.message || 'Aktarım başlatılamadı.');
+                }
+            } catch (err) {
+                console.error("Transfer start error:", err);
+                alert("Aktarım başlatılırken sunucu hatası oluştu.");
+            }
+        }
+
+        async function stopTransfer(mode) {
+            const btnG = document.getElementById('btn-t-graceful');
+            const btnI = document.getElementById('btn-t-immediate');
+            const statusMsg = document.getElementById('t-status-msg');
+
+            btnG.disabled = true;
+            btnI.disabled = true;
+
+            if (mode === 'immediate') {
+                statusMsg.innerText = "🛑 Hemen durduruluyor... Yarım kalan dosya silinip kaynak korunacak.";
+            } else {
+                statusMsg.innerText = "⏸️ Kontrollü durduruluyor... Mevcut dosya tamamlandıktan sonra duracak.";
+            }
+
+            try {
+                const res = await fetch(`/api/transfer/stop?mode=${mode}`);
+                const data = await res.json();
+                pollTransferStatus();
+            } catch (err) {
+                console.error("Transfer stop error:", err);
+            }
+        }
+
+        async function pollTransferStatus() {
+            try {
+                const res = await fetch('/api/transfer/status');
+                const data = await res.json();
+                const t = data.transfer;
+                const disk = data.disk;
+
+                if (!t) return;
+
+                // Overall progress
+                const doneGB = (t.transferred_bytes / (1024**3)).toFixed(2);
+                const totalGB = (t.total_bytes / (1024**3)).toFixed(2);
+                document.getElementById('t-overall-text').innerText = `${doneGB} GB / ${totalGB} GB (%${t.overall_percent})`;
+                document.getElementById('t-overall-fill').style.width = `${t.overall_percent}%`;
+
+                // Current file progress
+                const fileDoneMB = (t.current_file_bytes / (1024**2)).toFixed(1);
+                const fileTotalMB = (t.current_file_total / (1024**2)).toFixed(1);
+                document.getElementById('t-current-filename').innerText = t.current_file || '-';
+                document.getElementById('t-file-text').innerText = `${fileDoneMB} MB / ${fileTotalMB} MB (%${t.current_file_percent})`;
+                document.getElementById('t-file-fill').style.width = `${t.current_file_percent}%`;
+
+                // Metrics
+                document.getElementById('t-speed').innerText = `${t.speed_mbps} MB/s`;
+                
+                if (t.eta_seconds > 0) {
+                    const mins = Math.floor(t.eta_seconds / 60);
+                    const secs = t.eta_seconds % 60;
+                    document.getElementById('t-eta').innerText = mins > 0 ? `~${mins} dk ${secs} sn` : `~${secs} sn`;
+                } else {
+                    document.getElementById('t-eta').innerText = t.active ? 'Hesaplanıyor...' : '-';
+                }
+
+                document.getElementById('t-files-count').innerText = `${t.transferred_files} / ${t.total_files}`;
+                document.getElementById('t-status-msg').innerText = t.message || '-';
+
+                // Floating mini bar updates
+                const floating = document.getElementById('transfer-floating');
+                if (t.active) {
+                    floating.style.display = 'flex';
+                    document.getElementById('float-percent').innerText = `${t.overall_percent}%`;
+                    document.getElementById('float-file').innerText = t.current_file || 'Aktarılıyor';
+                    document.getElementById('float-speed').innerText = `${t.speed_mbps} MB/s`;
+                }
+
+                // If finished or stopped
+                if (!t.active) {
+                    document.getElementById('btn-t-graceful').disabled = true;
+                    document.getElementById('btn-t-immediate').disabled = true;
+
+                    if (transferPollTimer) {
+                        clearInterval(transferPollTimer);
+                        transferPollTimer = null;
+                    }
+
+                    if (t.phase === 'completed') {
+                        document.getElementById('t-overall-fill').style.backgroundColor = 'var(--accent-green)';
+                    }
+
+                    fetchStatus();
+                } else {
+                    document.getElementById('btn-t-graceful').disabled = false;
+                    document.getElementById('btn-t-immediate').disabled = false;
+                }
+            } catch (err) {
+                console.error("Poll transfer error:", err);
+            }
+        }
+
+        function openTransferModal() {
+            document.getElementById('transfer-modal-overlay').style.display = 'flex';
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transfer-modal-overlay').style.display = 'none';
         }
 
         function updateDynamicServiceLinks() {

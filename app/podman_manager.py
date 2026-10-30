@@ -14,6 +14,8 @@ if os.path.exists(config_file):
 PORT = config.getint('server', 'port', fallback=3000)
 NETWORK_NAME = config.get('podman', 'network', fallback='media_center_net')
 MEDIA_DIR = config.get('paths', 'media_dir', fallback='./media')
+EXTERNAL_MEDIA_DIR = config.get('paths', 'external_media_dir', fallback='E:/media')
+MEDIA_STUB_DIR = './media_external_stub'
 DOWNLOADS_DIR = config.get('paths', 'downloads_dir', fallback='./downloads')
 
 ALL_CONTAINERS = [
@@ -46,6 +48,54 @@ def subproc_kwargs():
         kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
     return kwargs
 
+def get_external_disk_info():
+    """Returns status and metrics for the external storage drive."""
+    drive_letter = os.path.splitdrive(EXTERNAL_MEDIA_DIR)[0] or 'E:'
+    is_connected = os.path.exists(EXTERNAL_MEDIA_DIR) or os.path.exists(drive_letter + '\\')
+    
+    info = {
+        "connected": is_connected,
+        "drive_letter": drive_letter,
+        "path": EXTERNAL_MEDIA_DIR,
+        "free_gb": 0.0,
+        "total_gb": 0.0,
+        "pending_movies_gb": 0.0,
+        "pending_series_gb": 0.0,
+        "total_pending_gb": 0.0
+    }
+    
+    if is_connected:
+        try:
+            import shutil
+            target_check = EXTERNAL_MEDIA_DIR if os.path.exists(EXTERNAL_MEDIA_DIR) else (drive_letter + '\\')
+            usage = shutil.disk_usage(target_check)
+            info["free_gb"] = round(usage.free / (1024**3), 1)
+            info["total_gb"] = round(usage.total / (1024**3), 1)
+        except Exception:
+            pass
+
+    # Calculate pending files in local D:\media_center\media\movies and series
+    local_media = os.path.abspath(os.path.join(project_root, MEDIA_DIR)) if not os.path.isabs(MEDIA_DIR) else MEDIA_DIR
+    local_movies = os.path.join(local_media, 'movies')
+    local_series = os.path.join(local_media, 'series')
+
+    def _calc_size(dir_path):
+        if not os.path.exists(dir_path):
+            return 0.0
+        total = 0
+        for root, dirs, files in os.walk(dir_path):
+            for f in files:
+                try:
+                    total += os.path.getsize(os.path.join(root, f))
+                except Exception:
+                    pass
+        return round(total / (1024**3), 2)
+
+    info["pending_movies_gb"] = _calc_size(local_movies)
+    info["pending_series_gb"] = _calc_size(local_series)
+    info["total_pending_gb"] = round(info["pending_movies_gb"] + info["pending_series_gb"], 2)
+    return info
+
 def resolve_compose_path(path_str, cwd):
     """Converts media/downloads path into a clean POSIX path relative to cwd for podman-compose."""
     target_dir = cwd if cwd else project_root
@@ -63,6 +113,21 @@ def run_command_generator(cmd, cwd=None):
         env = os.environ.copy()
         env['MEDIA_DIR'] = resolve_compose_path(MEDIA_DIR, cwd)
         env['DOWNLOADS_DIR'] = resolve_compose_path(DOWNLOADS_DIR, cwd)
+
+        # Dynamic external drive resolution: if external drive is attached, mount it;
+        # otherwise fallback to local empty stub directory so containers start cleanly without error!
+        disk_info = get_external_disk_info()
+        if disk_info["connected"] and os.path.exists(EXTERNAL_MEDIA_DIR):
+            env['EXTERNAL_MEDIA_DIR'] = resolve_compose_path(EXTERNAL_MEDIA_DIR, cwd)
+            env['EXTERNAL_MOVIES_DIR'] = resolve_compose_path(os.path.join(EXTERNAL_MEDIA_DIR, 'movies'), cwd)
+            env['EXTERNAL_SERIES_DIR'] = resolve_compose_path(os.path.join(EXTERNAL_MEDIA_DIR, 'series'), cwd)
+        else:
+            stub_abs = os.path.abspath(os.path.join(project_root, MEDIA_STUB_DIR))
+            os.makedirs(os.path.join(stub_abs, 'movies'), exist_ok=True)
+            os.makedirs(os.path.join(stub_abs, 'series'), exist_ok=True)
+            env['EXTERNAL_MEDIA_DIR'] = resolve_compose_path(MEDIA_STUB_DIR, cwd)
+            env['EXTERNAL_MOVIES_DIR'] = resolve_compose_path(os.path.join(MEDIA_STUB_DIR, 'movies'), cwd)
+            env['EXTERNAL_SERIES_DIR'] = resolve_compose_path(os.path.join(MEDIA_STUB_DIR, 'series'), cwd)
 
         process = subprocess.Popen(
             cmd,

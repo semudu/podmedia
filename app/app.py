@@ -14,6 +14,7 @@ import json
 
 import podman_manager
 import atexit
+from transfer_manager import transfer_manager
 
 # Ensure all PodMedia containers are stopped cleanly on application exit
 atexit.register(podman_manager.stop_all_containers_sync)
@@ -148,11 +149,35 @@ class AppHandler(BaseHTTPRequestHandler):
 
         elif path == '/api/status':
             containers, groups = podman_manager.get_container_states()
+            ext_disk = podman_manager.get_external_disk_info()
+            transfer_state = transfer_manager.get_status()
             self.send_json({
                 "containers": containers,
                 "groups": groups,
-                "is_busy": is_busy
+                "is_busy": is_busy,
+                "external_disk": ext_disk,
+                "transfer": transfer_state
             })
+
+        elif path == '/api/transfer/status':
+            transfer_state = transfer_manager.get_status()
+            ext_disk = podman_manager.get_external_disk_info()
+            self.send_json({
+                "transfer": transfer_state,
+                "disk": ext_disk
+            })
+
+        elif path == '/api/transfer/start':
+            local_media = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.MEDIA_DIR)) if not os.path.isabs(podman_manager.MEDIA_DIR) else podman_manager.MEDIA_DIR
+            target_ext = podman_manager.EXTERNAL_MEDIA_DIR
+            res = transfer_manager.start_transfer(local_media, target_ext, categories=("movies", "series"))
+            self.send_json(res)
+
+        elif path == '/api/transfer/stop':
+            query = urllib.parse.parse_qs(parsed.query)
+            mode = query.get('mode', ['immediate'])[0]
+            res = transfer_manager.stop_transfer(mode=mode)
+            self.send_json(res)
 
         elif path == '/api/stream':
             if is_busy:

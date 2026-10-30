@@ -19,6 +19,7 @@ services:
     volumes:
       - ./config:/config:Z
       - ${MEDIA_DIR:-../../media}:/media:Z
+      - ${EXTERNAL_MEDIA_DIR:-../../media_external_stub}:/media_external:Z
     ports:
       - "32400:32400"
       - "3005:3005"

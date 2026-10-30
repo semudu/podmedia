@@ -16,6 +16,7 @@ services:
     volumes:
       - ./radarr/config:/config:Z
       - ${MEDIA_DIR:-../../media}/movies:/movies:Z
+      - ${EXTERNAL_MOVIES_DIR:-../../media_external_stub/movies}:/movies_external:Z
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "7878:7878"
@@ -33,6 +34,7 @@ services:
     volumes:
       - ./sonarr/config:/config:Z
       - ${MEDIA_DIR:-../../media}/series:/series:Z
+      - ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}:/series_external:Z
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "8989:8989"
