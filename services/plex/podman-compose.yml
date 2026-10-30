@@ -22,7 +22,6 @@ services:
       - type: bind
         source: ${EXTERNAL_MEDIA_DIR:-../../media_external_stub}
         target: /media_external
-        read_only: true
     ports:
       - "32400:32400"
       - "3005:3005"

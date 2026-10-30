@@ -123,6 +123,21 @@ class MediaWatcher(threading.Thread):
         except Exception as e:
             pass
 
+    def trigger_plex_empty_trash(self, category):
+        """Purges deleted items from Plex library when deliberate file deletion is detected."""
+        mapping = self.get_plex_section_mapping()
+        sec_id = mapping.get(category)
+        if sec_id:
+            url = f"http://localhost:32400/library/sections/{sec_id}/emptyTrash"
+        else:
+            url = "http://localhost:32400/library/sections/all/emptyTrash"
+        try:
+            req = urllib.request.Request(url, method='PUT')
+            urllib.request.urlopen(req, timeout=3)
+            print(f"[MediaWatcher] Triggered Plex section emptyTrash for category '{category}' (section {sec_id})")
+        except Exception:
+            pass
+
     def run(self):
         # Trigger a full scan of all Plex libraries on startup
         trigger_plex_full_scan_on_startup()
@@ -171,7 +186,17 @@ class MediaWatcher(threading.Thread):
                     settled_snapshot = self.wait_for_copy_completion(cat, path)
                     self.snapshots[cat] = settled_snapshot
                     plex_cat = cat.replace('_ext', '')
+                    
+                    # Refresh Plex library and clean up trash so deleted media disappears instantly
                     self.trigger_plex_refresh(plex_cat)
+                    self.trigger_plex_empty_trash(plex_cat)
+
+                    # Synchronize Radarr and Sonarr so deleted items are unmonitored and never re-downloaded
+                    try:
+                        import radarr_sonarr_sync
+                        radarr_sonarr_sync.sync_all()
+                    except Exception as e:
+                        print("Sync error during watcher event:", e)
 
     def stop(self):
         self.running = False

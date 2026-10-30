@@ -124,6 +124,32 @@ def sync_radarr(external_movies_path=None, local_movies_path=None):
                 if cur.rowcount > 0:
                     updated_count += cur.rowcount
 
+        # 4. Check for deleted movies (unmonitor in Radarr if deleted from Plex or disk)
+        cur.execute("SELECT Id, Path, Monitored, MovieFileId FROM Movies")
+        all_movies = cur.fetchall()
+        for m_id, m_path, m_monitored, m_file_id in all_movies:
+            host_path = None
+            is_drive_mounted = False
+            rel = ""
+
+            if m_path.startswith("/movies_external/"):
+                if external_movies_path and os.path.exists(external_movies_path):
+                    rel = m_path.replace("/movies_external/", "").strip("/")
+                    host_path = os.path.join(external_movies_path, rel)
+                    is_drive_mounted = True
+            elif m_path.startswith("/movies/"):
+                rel = m_path.replace("/movies/", "").strip("/")
+                host_path = os.path.join(local_movies_path, rel)
+                is_drive_mounted = True
+
+            # If the storage drive IS connected, but the folder/file is gone: user deleted it!
+            if is_drive_mounted and host_path and not os.path.exists(host_path):
+                if m_monitored == 1 or m_file_id != 0:
+                    print(f"🗑️ [RadarrSync] Movie deleted from disk: '{rel}'. Unmonitoring in Radarr...")
+                    cur.execute("UPDATE Movies SET Monitored = 0, MovieFileId = 0 WHERE Id = ?", (m_id,))
+                    cur.execute("DELETE FROM MovieFiles WHERE MovieId = ?", (m_id,))
+                    updated_count += 1
+
         con.commit()
         con.close()
 
@@ -191,6 +217,33 @@ def sync_sonarr(external_series_path=None, local_series_path=None):
                 )
                 if cur.rowcount > 0:
                     updated_count += cur.rowcount
+
+        # 4. Check for deleted series / episodes (unmonitor in Sonarr if deleted from Plex or disk)
+        cur.execute("SELECT Id, Path, Monitored FROM Series")
+        all_series = cur.fetchall()
+        for s_id, s_path, s_monitored in all_series:
+            host_path = None
+            is_drive_mounted = False
+            rel = ""
+
+            if s_path.startswith("/series_external/") or s_path.startswith("/tv_external/"):
+                if external_series_path and os.path.exists(external_series_path):
+                    rel = s_path.replace("/series_external/", "").replace("/tv_external/", "").strip("/")
+                    host_path = os.path.join(external_series_path, rel)
+                    is_drive_mounted = True
+            elif s_path.startswith("/series/") or s_path.startswith("/tv/"):
+                rel = s_path.replace("/series/", "").replace("/tv/", "").strip("/")
+                host_path = os.path.join(local_series_path, rel)
+                is_drive_mounted = True
+
+            # If the storage drive IS connected, but the series folder is gone: user deleted it!
+            if is_drive_mounted and host_path and not os.path.exists(host_path):
+                if s_monitored == 1:
+                    print(f"🗑️ [SonarrSync] Series deleted from disk: '{rel}'. Unmonitoring in Sonarr...")
+                    cur.execute("UPDATE Series SET Monitored = 0 WHERE Id = ?", (s_id,))
+                    cur.execute("UPDATE Episodes SET Monitored = 0, EpisodeFileId = 0 WHERE SeriesId = ?", (s_id,))
+                    cur.execute("DELETE FROM EpisodeFiles WHERE SeriesId = ?", (s_id,))
+                    updated_count += 1
 
         con.commit()
         con.close()
