@@ -212,6 +212,19 @@ class AppHandler(BaseHTTPRequestHandler):
             res = auto_updater.auto_updater.check_and_update_running()
             self.send_json(res)
 
+        elif path == '/api/system/quit':
+            self.send_json({"status": "stopping", "message": "PodMedia kapatılıyor ve harici disk serbest bırakılıyor..."})
+            def _async_quit():
+                time.sleep(0.5)
+                try:
+                    import media_watcher
+                    media_watcher.stop_media_watcher()
+                except Exception:
+                    pass
+                podman_manager.stop_all_containers_sync()
+                os._exit(0)
+            threading.Thread(target=_async_quit, daemon=True).start()
+
         elif path == '/api/stream':
             if is_busy:
                 try:

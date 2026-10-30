@@ -54,7 +54,12 @@ class PodMediaTrayApp:
         threading.Thread(target=_run, daemon=True).start()
 
     def quit_app(self, icon, item):
-        print("[!] Quitting PodMedia: Stopping all running containers...")
+        print("[!] Quitting PodMedia: Stopping all running containers & releasing external disk...")
+        try:
+            import media_watcher
+            media_watcher.stop_media_watcher()
+        except Exception:
+            pass
         podman_manager.stop_all_containers_sync()
         if self.on_quit_callback:
             self.on_quit_callback()

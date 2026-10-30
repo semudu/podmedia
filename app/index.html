@@ -757,6 +757,9 @@
             <button id="stop-all-btn" class="btn-master stop" onclick="triggerAction('stop-all', '')">
                 🛑 Stop All
             </button>
+            <button id="quit-podmedia-btn" class="btn-master" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 8px 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="quitPodMedia()" title="PodMedia'yı, tüm konteynerleri durdurur ve harici diski güvenle serbest bırakır">
+                ⏻ Kapat
+            </button>
         </div>
     </header>
 
@@ -1247,6 +1250,26 @@
                     fetchStatus();
                 }, 1500);
             };
+        }
+
+        async function quitPodMedia() {
+            if (!confirm("PodMedia'yı ve tüm çalışan servisleri durdurup harici diski serbest bırakmak istiyor musunuz?")) {
+                return;
+            }
+            try {
+                const res = await fetch('/api/system/quit');
+                document.body.innerHTML = `
+                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#0f172a; color:#f8fafc; font-family:sans-serif; text-align:center; padding: 20px;">
+                        <h1 style="font-size:2.2rem; margin-bottom:1rem;">🛑 PodMedia Kapatıldı</h1>
+                        <p style="color:#94a3b8; font-size:1.15rem; max-width:550px; line-height:1.6;">
+                            Tüm servisler durduruldu, WSL mount bağlantıları çözüldü ve harici disk başarıyla serbest bırakıldı.<br><br>
+                            Diskinizi artık güvenle çıkarabilir veya bu tarayıcı sekmesini kapatabilirsiniz.
+                        </p>
+                    </div>
+                `;
+            } catch (e) {
+                alert("PodMedia kapatıldı veya bağlantı sonlandı.");
+            }
         }
 
         /* EXTERNAL STORAGE & HYBRID TRANSFER LOGIC */

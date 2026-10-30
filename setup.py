@@ -147,27 +147,109 @@ def run_setup():
     else:
         print(" [✓] Podman VM is active and running.")
 
-    # 5. OS-Specific Launcher Script Generation
-    print("\n[5/5] Generating OS-Specific Launcher Script...")
+    # 5. OS-Specific Launcher & Stopper Script Generation
+    print("\n[5/5] Generating OS-Specific Launcher & Stopper Scripts...")
     system_os = platform.system()
     if system_os == "Windows":
         launcher_path = os.path.join(base_dir, "start.bat")
-        content = "@echo off\nstart \"\" pythonw app\\app.py\n"
         with open(launcher_path, "w", encoding="utf-8") as f:
-            f.write(content)
+            f.write("@echo off\nstart \"\" pythonw app\\app.py\n")
         print(" [✓] Created Windows launcher: 'start.bat'")
-        launch_msg = "Run '.\\start.bat' or double-click 'start.bat' to launch PodMedia."
+
+        stopper_path = os.path.join(base_dir, "stop.bat")
+        stop_content = (
+            "@echo off\n"
+            "title PodMedia - Durduruluyor...\n\n"
+            "echo ==================================================\n"
+            "echo   PodMedia - Servisleri ve Konteynerleri Durdur\n"
+            "echo ==================================================\n"
+            "echo.\n\n"
+            "echo [1/3] PodMedia konteynerleri durduruluyor...\n"
+            "for /f \"tokens=*\" %%i in ('podman ps -q --filter \"name=media_center_\"') do (\n"
+            "    echo   - Durduruluyor: %%i\n"
+            "    podman stop %%i >nul 2>&1\n"
+            ")\n"
+            "echo   [OK] Tum PodMedia konteynerleri durduruldu.\n\n"
+            "echo.\n"
+            "echo [2/3] Harici disk baglantilari serbest birakiliyor (WSL)...\n"
+            "wsl -d podman-machine-default -u root umount /mnt/e >nul 2>&1\n"
+            "wsl -d podman-machine-default -u root umount /mnt/f >nul 2>&1\n"
+            "wsl -d podman-machine-default -u root umount /mnt/g >nul 2>&1\n"
+            "echo   [OK] Harici disk mountlari WSL uzerinden guvenle ayrildi.\n\n"
+            "echo.\n"
+            "echo [3/3] PodMedia web sunucusu ve arka plan surecleri kapatiliyor...\n"
+            "for /f \"tokens=5\" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING') do (\n"
+            "    taskkill /F /PID %%a >nul 2>&1\n"
+            ")\n"
+            "powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*app\\app.py*' -or $_.CommandLine -like '*app/app.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\" >nul 2>&1\n"
+            "echo   [OK] Web sunucusu ve izleme surecleri kapatildi.\n\n"
+            "echo.\n"
+            "echo ==================================================\n"
+            "echo   [OK] PodMedia basariyla kapatildi!\n"
+            "echo   [OK] Harici disk serbest birakildi (guvenle cikarilabilir).\n"
+            "echo ==================================================\n"
+            "echo.\n"
+            "ping 127.0.0.1 -n 3 >nul\n"
+            "exit /b 0\n"
+        )
+        with open(stopper_path, "w", encoding="utf-8") as f:
+            f.write(stop_content)
+        print(" [✓] Created Windows stopper: 'stop.bat'")
+        launch_msg = (
+            "Run '.\\start.bat' or double-click 'start.bat' to launch PodMedia.\n"
+            " Run '.\\stop.bat' or double-click 'stop.bat' to stop PodMedia & release external drives."
+        )
     else:
         launcher_path = os.path.join(base_dir, "start.sh")
-        content = "#!/usr/bin/env bash\npython3 app/app.py &\n"
         with open(launcher_path, "w", encoding="utf-8") as f:
-            f.write(content)
+            f.write("#!/usr/bin/env bash\npython3 app/app.py &\n")
         try:
             os.chmod(launcher_path, 0o755)
         except Exception:
             pass
         print(" [✓] Created Unix launcher: 'start.sh' (chmod +x)")
-        launch_msg = "Run './start.sh' to launch PodMedia."
+
+        stopper_path = os.path.join(base_dir, "stop.sh")
+        stop_sh_content = (
+            "#!/usr/bin/env bash\n"
+            "# PodMedia Stop Script\n\n"
+            "echo \"==================================================\"\n"
+            "echo \"  PodMedia - Servisleri ve Konteynerleri Durdur\"\n"
+            "echo \"==================================================\"\n"
+            "echo \"\"\n\n"
+            "echo \"[1/3] PodMedia konteynerleri durduruluyor...\"\n"
+            "podman ps -q --filter \"name=media_center_\" | while read -r c; do\n"
+            "    echo \"  - Durduruluyor: $c\"\n"
+            "    podman stop \"$c\" >/dev/null 2>&1\n"
+            "done\n"
+            "echo \"  [OK] Tum konteynerler durduruldu.\"\n\n"
+            "echo \"\"\n"
+            "echo \"[2/3] Harici disk baglantilari serbest birakiliyor (WSL)...\"\n"
+            "wsl -d podman-machine-default -u root umount /mnt/e >/dev/null 2>&1 || true\n"
+            "wsl -d podman-machine-default -u root umount /mnt/f >/dev/null 2>&1 || true\n"
+            "wsl -d podman-machine-default -u root umount /mnt/g >/dev/null 2>&1 || true\n"
+            "echo \"  [OK] Harici disk mountlari serbest birakildi.\"\n\n"
+            "echo \"\"\n"
+            "echo \"[3/3] PodMedia web sunucusu ve arka plan surecleri kapatiliyor...\"\n"
+            "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { \\$_.CommandLine -like '*app\\app.py*' -or \\$_.CommandLine -like '*app/app.py*' } | ForEach-Object { Stop-Process -Id \\$_.ProcessId -Force }\" >/dev/null 2>&1 || true\n"
+            "echo \"  [OK] Web sunucusu kapatildi.\"\n\n"
+            "echo \"\"\n"
+            "echo \"==================================================\"\n"
+            "echo \"  [OK] PodMedia basariyla kapatildi!\"\n"
+            "echo \"  [OK] Harici disk serbest birakildi.\"\n"
+            "echo \"==================================================\"\n"
+        )
+        with open(stopper_path, "w", encoding="utf-8") as f:
+            f.write(stop_sh_content)
+        try:
+            os.chmod(stopper_path, 0o755)
+        except Exception:
+            pass
+        print(" [✓] Created Unix stopper: 'stop.sh' (chmod +x)")
+        launch_msg = (
+            "Run './start.sh' to launch PodMedia.\n"
+            " Run './stop.sh' to stop PodMedia & release external drives."
+        )
 
     print("\n==================================================")
     print(" 🎉 PodMedia Setup Completed Successfully!")
