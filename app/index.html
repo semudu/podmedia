@@ -744,6 +744,9 @@
     <header>
         <h1>🍿 PodMedia Hub</h1>
         <div class="header-actions">
+            <div class="active-badge" id="update-badge" title="Açık konteynerler için otomatik güncelleme devrede (tıklayarak hemen kontrol edebilirsiniz)" style="cursor: pointer; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8;" onclick="checkUpdatesNow()">
+                🔄 Auto-Update: Aktif
+            </div>
             <div class="active-badge" id="active-summary">
                 <span class="pulse-dot" id="pulse-dot"></span>
                 <span id="active-count">0 / 8 Active</span>
@@ -1508,6 +1511,23 @@
             } catch (err) {
                 console.error("Choose disk error:", err);
                 alert("Disk seçilirken sunucu hatası oluştu.");
+            }
+        }
+
+        async function checkUpdatesNow() {
+            const badge = document.getElementById('update-badge');
+            if (badge) badge.innerText = "⏳ Taranıyor...";
+            try {
+                const res = await fetch('/api/updates/check');
+                const data = await res.json();
+                if (badge) {
+                    badge.innerText = (data.updated && data.updated.length > 0) 
+                        ? `✓ ${data.updated.length} Güncellendi!` 
+                        : "✓ İmajlar Güncel";
+                    setTimeout(() => { badge.innerText = "🔄 Auto-Update: Aktif"; }, 4000);
+                }
+            } catch (e) {
+                if (badge) badge.innerText = "🔄 Auto-Update: Aktif";
             }
         }
 

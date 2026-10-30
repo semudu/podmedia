@@ -203,6 +203,15 @@ class AppHandler(BaseHTTPRequestHandler):
             else:
                 self.send_json({"status": "error", "message": "Eksik parametre: drive"}, 400)
 
+        elif path == '/api/updates/status':
+            import auto_updater
+            self.send_json(auto_updater.auto_updater.get_status())
+
+        elif path == '/api/updates/check':
+            import auto_updater
+            res = auto_updater.auto_updater.check_and_update_running()
+            self.send_json(res)
+
         elif path == '/api/stream':
             if is_busy:
                 try:
@@ -348,6 +357,10 @@ def run():
     import media_watcher
     media_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.MEDIA_DIR)) if not os.path.isabs(podman_manager.MEDIA_DIR) else podman_manager.MEDIA_DIR
     media_watcher.start_media_watcher(media_dir)
+
+    # Start automated background container updater (keeps running containers on latest images)
+    import auto_updater
+    auto_updater.start_auto_updater()
 
     print(f"==================================================")
     print(f" 🍿 PodMedia App running at http://localhost:{PORT}")
