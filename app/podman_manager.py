@@ -14,7 +14,6 @@ if os.path.exists(config_file):
 PORT = config.getint('server', 'port', fallback=3000)
 NETWORK_NAME = config.get('podman', 'network', fallback='media_center_net')
 MEDIA_DIR = config.get('paths', 'media_dir', fallback='./media')
-EXTERNAL_MEDIA_DIR = config.get('paths', 'external_media_dir', fallback='E:/media')
 MEDIA_STUB_DIR = './media_external_stub'
 DOWNLOADS_DIR = config.get('paths', 'downloads_dir', fallback='./downloads')
 
@@ -51,11 +50,11 @@ def subproc_kwargs():
 from disk_manager import disk_manager
 
 def get_external_media_dir():
-    """Returns the dynamic media directory path of the active external disk, or configured fallback."""
+    """Returns the dynamic media directory path of the active external disk, or local stub fallback."""
     active = disk_manager.get_active_disk()
     if active and active.get("connected") and active.get("media_path"):
         return active["media_path"]
-    return EXTERNAL_MEDIA_DIR
+    return MEDIA_STUB_DIR
 
 def get_external_disk_info():
     """Returns dynamic status and metrics for the currently attached target storage drive."""
@@ -64,10 +63,10 @@ def get_external_disk_info():
     
     info = {
         "connected": bool(active and active.get("connected")),
-        "drive_letter": active.get("letter", "E:") if active else "E:",
+        "drive_letter": active.get("letter", "") if active else "",
         "label": active.get("label", cfg.get("target_label", "Harici Disk")) if active else cfg.get("target_label", "Harici Disk"),
         "serial": active.get("serial", cfg.get("target_serial", "")) if active else cfg.get("target_serial", ""),
-        "path": active.get("media_path", "E:/media") if active else "E:/media",
+        "path": active.get("media_path", "") if active else "",
         "free_gb": active.get("free_gb", 0.0) if active else 0.0,
         "total_gb": active.get("total_gb", 0.0) if active else 0.0,
         "pending_movies_gb": 0.0,

@@ -19,6 +19,8 @@
 
 # Local environment & properties files
 config.properties
+disk_config.json
+media_external_stub/
 .env
 **/.env
 **/.env.local

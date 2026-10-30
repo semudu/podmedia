@@ -18,8 +18,8 @@ class DiskManager:
     def _ensure_config(self):
         if not os.path.exists(self.config_path):
             default_config = {
-                "target_serial": "56CA-9E47",  # Default to current smd-disk
-                "target_label": "smd-disk",
+                "target_serial": "",
+                "target_label": "",
                 "folder_name": "media"
             }
             try:
@@ -119,8 +119,8 @@ class DiskManager:
         all_drives = self.list_available_drives()
 
         for d in all_drives:
-            # Match by unique Volume Serial Number or by marker file
-            if (target_serial and d["serial"] == target_serial) or d["has_marker"]:
+            # Match by marker file (.podmedia_disk_id) or registered target Volume Serial Number
+            if d["has_marker"] or (target_serial and d["serial"] == target_serial):
                 media_path = os.path.join(d["letter"] + "\\", folder_name)
                 return {
                     "connected": True,
@@ -134,25 +134,6 @@ class DiskManager:
                     "movies_path": os.path.join(media_path, "movies"),
                     "series_path": os.path.join(media_path, "series")
                 }
-
-        # If no registered disk matches, but an existing E:\media exists as legacy fallback
-        if os.path.exists("E:\\media"):
-            try:
-                usage = shutil.disk_usage("E:\\")
-                return {
-                    "connected": True,
-                    "letter": "E:",
-                    "label": "smd-disk",
-                    "serial": "56CA-9E47",
-                    "fs": "exFAT",
-                    "free_gb": round(usage.free / (1024**3), 1),
-                    "total_gb": round(usage.total / (1024**3), 1),
-                    "media_path": "E:\\media",
-                    "movies_path": "E:\\media\\movies",
-                    "series_path": "E:\\media\\series"
-                }
-            except Exception:
-                pass
 
         return None
 
@@ -218,3 +199,4 @@ class DiskManager:
 # Global instance
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 disk_manager = DiskManager(project_root)
+
