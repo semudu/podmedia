@@ -223,7 +223,21 @@ def apply_target_state(target_containers):
                 for log in run_command_generator(f'podman stop {c}'):
                     yield log
 
+    release_external_mounts()
     yield "\n[✓] ACTION COMPLETED SUCCESSFULLY!\n"
+
+def release_external_mounts():
+    """Safely unmounts external drive mounts in WSL when no media_center containers are running.
+    This frees Windows file locks so the external disk can be safely ejected or placed in sleep mode."""
+    try:
+        res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, **subproc_kwargs())
+        if res.returncode == 0 and not res.stdout.strip():
+            active_disk = disk_manager.get_active_disk()
+            if active_disk and active_disk.get('letter'):
+                letter = active_disk['letter'][0].lower()
+                subprocess.run(['wsl', '-d', 'podman-machine-default', '-u', 'root', 'umount', f'/mnt/{letter}'], capture_output=True, text=True, **subproc_kwargs())
+    except Exception:
+        pass
 
 def stop_all_containers_sync():
     """Synchronously stops all running PodMedia containers (used on application exit)."""
@@ -233,6 +247,7 @@ def stop_all_containers_sync():
             containers = [c.strip() for c in res.stdout.strip().splitlines() if c.strip()]
             for c in containers:
                 subprocess.run(['podman', 'stop', c], capture_output=True, text=True, **subproc_kwargs())
+        release_external_mounts()
     except Exception as e:
         print("Error during sync container cleanup:", e)
 
@@ -250,7 +265,8 @@ def stop_all_containers():
                 yield f"[-] Stopping: {c}...\n"
                 for log in run_command_generator(f'podman stop {c}'):
                     yield log
-    yield "\n[✓] ALL SERVICES STOPPED!\n"
+    release_external_mounts()
+    yield "\n[✓] ALL SERVICES STOPPED (External disk released)!\n"
 
 def cleanup_empty_dirs(target_dir):
     """Recursively removes empty folders in target_dir."""
@@ -352,4 +368,5 @@ def stop_single_app(app_name):
     yield f"[-] Stopping '{app_name.upper()}' service ({container_name})...\n"
     for log in run_command_generator(f'podman stop {container_name}'):
         yield log
+    release_external_mounts()
     yield f"\n[✓] '{app_name.upper()}' STOPPED SUCCESSFULLY!\n"

@@ -1,9 +1,16 @@
 import os
 import time
 import threading
+import subprocess
 import xml.etree.ElementTree as ET
 import urllib.request
 from disk_manager import disk_manager
+
+def subproc_kwargs():
+    kwargs = {}
+    if os.name == 'nt':
+        kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
+    return kwargs
 
 class MediaWatcher(threading.Thread):
     def __init__(self, media_dir, poll_interval=3, quiet_seconds=6):
@@ -13,12 +20,40 @@ class MediaWatcher(threading.Thread):
         self.quiet_seconds = quiet_seconds
         self.running = True
         self.snapshots = {}
+        self.fast_signatures = {}
         
         self.target_folders = {
             'movies': os.path.join(self.media_dir, 'movies'),
             'series': os.path.join(self.media_dir, 'series'),
             'music': os.path.join(self.media_dir, 'music')
         }
+
+    def are_containers_running(self):
+        """Quickly checks if any PodMedia containers are currently running."""
+        try:
+            res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, timeout=3, **subproc_kwargs())
+            return res.returncode == 0 and bool(res.stdout.strip())
+        except Exception:
+            return False
+
+    def get_fast_signature(self, path):
+        """Lightweight non-recursive signature based on root and immediate child directory mtimes.
+        Takes < 1ms and avoids keeping mechanical external disks spinning with constant recursive walks."""
+        if not os.path.exists(path):
+            return None
+        try:
+            stat = os.stat(path)
+            sig = [stat.st_mtime]
+            with os.scandir(path) as it:
+                for entry in it:
+                    try:
+                        s = entry.stat()
+                        sig.append((entry.name, s.st_mtime, s.st_size if entry.is_file() else 0))
+                    except Exception:
+                        pass
+            return tuple(sig)
+        except Exception:
+            return None
         
     def get_folder_snapshot(self, path):
         """Returns (total_files, total_bytes, latest_mtime) for a directory tree."""
@@ -143,12 +178,25 @@ class MediaWatcher(threading.Thread):
         trigger_plex_full_scan_on_startup()
 
         for cat, path in self.target_folders.items():
+            self.fast_signatures[cat] = self.get_fast_signature(path)
             self.snapshots[cat] = self.get_folder_snapshot(path)
 
         last_ext_connected = False
+        containers_active = True
+        loop_counter = 0
 
         while self.running:
             time.sleep(self.poll_interval)
+            loop_counter += 1
+
+            # Check container status every 3 iterations (~9 seconds)
+            if loop_counter % 3 == 0:
+                containers_active = self.are_containers_running()
+
+            # If NO media containers are running, do NOT touch external drives!
+            # Keeps mechanical drives asleep and frees handles so drives can be safely ejected.
+            if not containers_active:
+                continue
 
             # Dynamically update external disk paths
             try:
@@ -179,12 +227,22 @@ class MediaWatcher(threading.Thread):
                     # Skip without triggering false deletion scan in Plex!
                     continue
 
+                # Ultra-fast non-recursive signature check (< 1ms, zero deep disk traversal)
+                current_fast_sig = self.get_fast_signature(path)
+                last_fast_sig = self.fast_signatures.get(cat)
+
+                if current_fast_sig == last_fast_sig and current_fast_sig is not None:
+                    # Nothing changed at all; skip without touching deeper files!
+                    continue
+
+                self.fast_signatures[cat] = current_fast_sig
                 current_snapshot = self.get_folder_snapshot(path)
                 last_snapshot = self.snapshots.get(cat, (0, 0, 0))
                 
                 if current_snapshot != last_snapshot:
                     settled_snapshot = self.wait_for_copy_completion(cat, path)
                     self.snapshots[cat] = settled_snapshot
+                    self.fast_signatures[cat] = self.get_fast_signature(path)
                     plex_cat = cat.replace('_ext', '')
                     
                     # Refresh Plex library and clean up trash so deleted media disappears instantly
