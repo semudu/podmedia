@@ -59,13 +59,12 @@ def get_external_media_dir():
 def get_external_disk_info():
     """Returns dynamic status and metrics for the currently attached target storage drive."""
     active = disk_manager.get_active_disk()
-    cfg = disk_manager.get_config()
     
     info = {
         "connected": bool(active and active.get("connected")),
         "drive_letter": active.get("letter", "") if active else "",
-        "label": active.get("label", cfg.get("target_label", "Harici Disk")) if active else cfg.get("target_label", "Harici Disk"),
-        "serial": active.get("serial", cfg.get("target_serial", "")) if active else cfg.get("target_serial", ""),
+        "label": active.get("label", "Harici Disk") if active else "Harici Disk",
+        "serial": active.get("serial", "") if active else "",
         "path": active.get("media_path", "") if active else "",
         "free_gb": active.get("free_gb", 0.0) if active else 0.0,
         "total_gb": active.get("total_gb", 0.0) if active else 0.0,

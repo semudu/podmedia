@@ -11,45 +11,7 @@ class DiskManager:
     """
     def __init__(self, project_root):
         self.project_root = os.path.abspath(project_root)
-        self.config_path = os.path.join(self.project_root, 'disk_config.json')
         self.kernel32 = ctypes.windll.kernel32 if os.name == 'nt' else None
-        self._ensure_config()
-
-    def _ensure_config(self):
-        if not os.path.exists(self.config_path):
-            default_config = {
-                "target_serial": "",
-                "target_label": "",
-                "folder_name": "media"
-            }
-            try:
-                with open(self.config_path, 'w', encoding='utf-8') as f:
-                    json.dump(default_config, f, indent=2)
-            except Exception:
-                pass
-
-    def get_config(self):
-        try:
-            if os.path.exists(self.config_path):
-                with open(self.config_path, 'r', encoding='utf-8') as f:
-                    return json.load(f)
-        except Exception:
-            pass
-        return {"target_serial": "", "target_label": "", "folder_name": "media"}
-
-    def save_config(self, serial, label, folder_name="media"):
-        config = {
-            "target_serial": serial,
-            "target_label": label,
-            "folder_name": folder_name
-        }
-        try:
-            with open(self.config_path, 'w', encoding='utf-8') as f:
-                json.dump(config, f, indent=2)
-            return True
-        except Exception as e:
-            print("Error saving disk_config.json:", e)
-            return False
 
     def list_available_drives(self):
         """Scans and lists all external/secondary drives attached to the system (excluding C: and project drive)."""
@@ -60,8 +22,6 @@ class DiskManager:
         bitmask = self.kernel32.GetLogicalDrives()
         app_drive = os.path.splitdrive(self.project_root)[0].upper()
         sys_drive = os.environ.get('SystemDrive', 'C:').upper()
-        cfg = self.get_config()
-        target_serial = cfg.get("target_serial", "")
 
         for i in range(26):
             if bitmask & (1 << i):
@@ -93,7 +53,6 @@ class DiskManager:
 
                         marker_file = os.path.join(root, '.podmedia_disk_id')
                         has_marker = os.path.exists(marker_file)
-                        is_target = (formatted_serial == target_serial) or has_marker
 
                         drives.append({
                             "letter": letter,
@@ -104,7 +63,7 @@ class DiskManager:
                             "total_gb": total_gb,
                             "is_removable": (drive_type == 2),
                             "has_marker": has_marker,
-                            "is_selected": is_target
+                            "is_selected": has_marker
                         })
         return drives
 
@@ -113,14 +72,12 @@ class DiskManager:
         Locates the registered PodMedia target disk across all currently attached drive letters.
         Returns drive info dictionary if found, or None if the disk is unplugged.
         """
-        cfg = self.get_config()
-        target_serial = cfg.get("target_serial", "")
-        folder_name = cfg.get("folder_name", "media")
+        folder_name = "media"
         all_drives = self.list_available_drives()
 
         for d in all_drives:
-            # Match by marker file (.podmedia_disk_id) or registered target Volume Serial Number
-            if d["has_marker"] or (target_serial and d["serial"] == target_serial):
+            # Match by marker file (.podmedia_disk_id) located directly on the drive root
+            if d["has_marker"]:
                 media_path = os.path.join(d["letter"] + "\\", folder_name)
                 return {
                     "connected": True,
@@ -162,6 +119,16 @@ class DiskManager:
         serial = vol_info["serial"]
         label = vol_info["label"]
 
+        # Clear marker from any other drive so only one active archive disk is designated
+        for d in self.list_available_drives():
+            if d["letter"] != drive_letter and d["has_marker"]:
+                old_marker = os.path.join(d["letter"] + "\\", '.podmedia_disk_id')
+                try:
+                    if os.path.exists(old_marker):
+                        os.remove(old_marker)
+                except Exception:
+                    pass
+
         # Write marker file to root of the drive for instant recognition anywhere
         marker_path = os.path.join(root, '.podmedia_disk_id')
         marker_data = {
@@ -181,8 +148,12 @@ class DiskManager:
         os.makedirs(os.path.join(media_path, 'movies'), exist_ok=True)
         os.makedirs(os.path.join(media_path, 'series'), exist_ok=True)
 
-        # Save config
-        self.save_config(serial, label, "media")
+        # Sync Radarr and Sonarr libraries
+        try:
+            import radarr_sonarr_sync
+            radarr_sonarr_sync.sync_all()
+        except Exception:
+            pass
 
         return {
             "status": "ok",

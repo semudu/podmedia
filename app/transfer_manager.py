@@ -294,6 +294,13 @@ class TransferManager:
             # Rescan Plex
             self._trigger_plex_scan()
 
+            # Synchronize Radarr and Sonarr paths so they immediately recognize moved files
+            try:
+                import radarr_sonarr_sync
+                radarr_sonarr_sync.sync_all()
+            except Exception as se:
+                print("Warning syncing Radarr/Sonarr after transfer:", se)
+
             with self.lock:
                 if self.state["phase"] != "completed":
                     self.state["active"] = False

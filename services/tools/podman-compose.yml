@@ -34,7 +34,9 @@ services:
     volumes:
       - ./sonarr/config:/config:Z
       - ${MEDIA_DIR:-../../media}/series:/series:Z
+      - ${MEDIA_DIR:-../../media}/series:/tv:Z
       - ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}:/series_external:Z
+      - ${EXTERNAL_SERIES_DIR:-../../media_external_stub/series}:/tv_external:Z
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
     ports:
       - "8989:8989"

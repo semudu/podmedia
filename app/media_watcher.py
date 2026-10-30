@@ -143,7 +143,12 @@ class MediaWatcher(threading.Thread):
                     self.target_folders['movies_ext'] = active_disk['movies_path']
                     self.target_folders['series_ext'] = active_disk['series_path']
                     if not last_ext_connected:
-                        print(f"🔌 [MediaWatcher] External disk connected ({active_disk.get('label')}, {active_disk.get('drive')}). Refreshing Plex libraries...")
+                        print(f"🔌 [MediaWatcher] External disk connected ({active_disk.get('label')}, {active_disk.get('letter')}). Refreshing Plex & syncing Radarr/Sonarr...")
+                        try:
+                            import radarr_sonarr_sync
+                            radarr_sonarr_sync.sync_all()
+                        except Exception:
+                            pass
                         self.trigger_plex_refresh('movies')
                         self.trigger_plex_refresh('series')
                 else:
