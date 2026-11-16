@@ -20,6 +20,7 @@
 # Local environment & properties files
 config.properties
 disk_config.json
+*.running
 media_external_stub/
 .env
 **/.env
@@ -29,8 +30,18 @@ media_external_stub/
 # Dynamically generated OS Launchers & Stoppers
 start.bat
 start.sh
+start_plex.bat
+start_plex.sh
+stop_plex.bat
+stop_plex.sh
+start_downloads.bat
+start_downloads.sh
+stop_downloads.bat
+stop_downloads.sh
 stop.bat
 stop.sh
+status.bat
+status.sh
 
 # Python cache & virtual environments
 __pycache__/

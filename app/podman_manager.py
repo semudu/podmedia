@@ -1,6 +1,8 @@
 import os
 import subprocess
 import configparser
+import json
+import time
 
 # Project Root directory (parent of app/)
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -146,15 +148,54 @@ def run_command_generator(cmd, cwd=None):
     except Exception as e:
         yield f"Error: {str(e)}\n"
 
+def is_podman_machine_running():
+    """Checks if the podman machine VM is currently running."""
+    try:
+        list_res = subprocess.run(['podman', 'machine', 'list', '--format', 'json'], capture_output=True, text=True, **subproc_kwargs())
+        if list_res.returncode == 0 and list_res.stdout.strip():
+            machines = json.loads(list_res.stdout)
+            return any(m.get('Running') for m in machines)
+    except Exception:
+        pass
+    return False
+
 def ensure_podman_machine():
-    """Returns True if podman machine is running, else attempts to start it."""
-    res = subprocess.run(['podman', 'info'], capture_output=True, text=True, **subproc_kwargs())
-    if res.returncode != 0:
-        yield "[!] Podman machine is offline, starting (podman machine start)...\n"
-        for line in run_command_generator('podman machine start'):
+    """Ensures that the Podman machine is running and responsive."""
+    # 1. Retry loop for podman info (handles transient SSH socket busy/handshake states)
+    for attempt in range(3):
+        res = subprocess.run(['podman', 'info'], capture_output=True, text=True, **subproc_kwargs())
+        if res.returncode == 0:
+            yield "[✓] Podman machine is active.\n"
+            return
+        time.sleep(1)
+
+    # 2. Check if the VM is actually running according to podman machine list
+    if is_podman_machine_running():
+        for _ in range(5):
+            time.sleep(1)
+            check = subprocess.run(['podman', 'info'], capture_output=True, text=True, **subproc_kwargs())
+            if check.returncode == 0:
+                yield "[✓] Podman socket is ready.\n"
+                return
+        yield "[✓] Podman machine is running.\n"
+        return
+
+    # 3. Machine is offline in Podman; terminate any orphaned bare-WSL session before starting
+    if os.name == 'nt':
+        subprocess.run(['wsl', '--terminate', 'podman-machine-default'], capture_output=True, **subproc_kwargs())
+
+    yield "[!] Podman machine is offline, starting (podman machine start)...\n"
+    for line in run_command_generator('podman machine start'):
+        if "already running" not in line.lower():
             yield line
-    else:
-        yield "[✓] Podman machine is active.\n"
+
+    # Wait for machine to initialize
+    for _ in range(8):
+        time.sleep(1)
+        check = subprocess.run(['podman', 'info'], capture_output=True, text=True, **subproc_kwargs())
+        if check.returncode == 0:
+            yield "[✓] Podman machine started and ready.\n"
+            return
 
 def ensure_network():
     """Ensures that the dedicated Podman network exists."""
@@ -184,10 +225,60 @@ def get_container_states():
     }
     return states, groups
 
+def ensure_external_mounts():
+    """Ensures that if an external disk is connected, it is woken up, brought online, and mounted inside Podman's VM namespace.
+    If no external disk is connected (unplugged or never configured), ensures local stub fallback is used and recreates
+    any containers that still hold a stale mount reference to a disconnected external drive."""
+    try:
+        if os.name == 'nt':
+            disk_manager.wake_all_external_drives()
+
+        active = disk_manager.get_active_disk()
+        stub_abs = os.path.abspath(os.path.join(project_root, MEDIA_STUB_DIR))
+        os.makedirs(os.path.join(stub_abs, 'movies'), exist_ok=True)
+        os.makedirs(os.path.join(stub_abs, 'series'), exist_ok=True)
+
+        if active and active.get("connected") and active.get("letter"):
+            letter = active["letter"][0].lower()
+            drive_root = f"{letter.upper()}:\\"
+            if os.name == 'nt':
+                try:
+                    os.listdir(drive_root)
+                except Exception:
+                    pass
+                check_cmd = f"stat /mnt/{letter}/media >/dev/null 2>&1"
+                chk = subprocess.run(['podman', 'machine', 'ssh', check_cmd], capture_output=True, text=True, **subproc_kwargs())
+                if chk.returncode != 0:
+                    yield f"[+] Mounting external disk ({letter.upper()}:) into Podman VM...\n"
+                    mount_cmd = f"sudo umount -l /mnt/{letter} 2>/dev/null; sudo mkdir -p /mnt/{letter} && sudo mount -t drvfs '{letter.upper()}:\\' /mnt/{letter}"
+                    subprocess.run(['podman', 'machine', 'ssh', mount_cmd], capture_output=True, text=True, **subproc_kwargs())
+            expected_mount_token = f"/mnt/{letter}/media"
+        else:
+            yield "[i] No external disk attached — running in local storage mode.\n"
+            expected_mount_token = "media_external_stub"
+
+        # If existing containers have a different mount path baked in (e.g. disk was unplugged or newly plugged in),
+        # remove the container definition so podman-compose recreates it with the current mount path.
+        for cname in ('media_center_plex', 'media_center_radarr', 'media_center_sonarr'):
+            insp = subprocess.run(
+                ['podman', 'inspect', '--format', '{{range .Mounts}}{{.Source}} {{end}}', cname],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            if insp.returncode == 0 and insp.stdout.strip():
+                mounts_str = insp.stdout.strip()
+                if expected_mount_token not in mounts_str:
+                    yield f"[i] Updating storage mount binding for {cname}...\n"
+                    subprocess.run(['podman', 'rm', '-f', cname], capture_output=True, text=True, **subproc_kwargs())
+    except Exception as e:
+        print("Error ensuring external mounts:", e)
+
 def apply_target_state(target_containers):
     """Main engine to start target containers and stop unneeded ones with live logging."""
     for log in ensure_podman_machine():
         yield log
+    if target_containers:
+        for log in ensure_external_mounts():
+            yield log
     for log in ensure_network():
         yield log
 
@@ -223,59 +314,158 @@ def apply_target_state(target_containers):
                 for log in run_command_generator(f'podman stop {c}'):
                     yield log
 
-    release_external_mounts()
+    if 'media_center_plex' in target_containers:
+        write_plex_state_file()
+    else:
+        remove_plex_state_file()
+
+    if 'media_center_radarr' in target_containers and 'media_center_sonarr' in target_containers and 'media_center_qbittorrent' in target_containers:
+        write_downloads_state_file()
+    else:
+        remove_downloads_state_file()
+
+    for log in release_external_mounts_with_logs():
+        yield log
     yield "\n[✓] ACTION COMPLETED SUCCESSFULLY!\n"
 
-def release_external_mounts():
-    """Safely unmounts external drive mounts in WSL and flushes volume buffers when no media_center containers are running.
-    This frees Windows file locks generically so any external disk can be safely ejected or placed in sleep mode."""
+def release_external_mounts_with_logs(power_down=False):
+    """Generator that unmounts external drive mounts in WSL/Podman VM, flushes Windows volume buffers, and optionally puts the drive offline & spins down motor."""
     try:
-        res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, **subproc_kwargs())
-        if res.returncode == 0 and not res.stdout.strip():
-            letters = set()
-            active_disk = disk_manager.get_active_disk()
-            if active_disk and active_disk.get('letter'):
-                letters.add(active_disk['letter'][0].lower())
-            for d in disk_manager.list_available_drives():
-                if d.get('letter'):
-                    letters.add(d['letter'][0].lower())
-            letters.update(['e', 'f', 'g'])
+        machine_running = is_podman_machine_running()
+        if machine_running:
+            res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, **subproc_kwargs())
+            if res.returncode == 0 and res.stdout.strip():
+                # Containers are still running; do not unmount
+                return
 
+        letters = set()
+        active_disk = disk_manager.get_active_disk()
+        if active_disk and active_disk.get('letter'):
+            letters.add(active_disk['letter'][0].lower())
+        for d in disk_manager.list_available_drives():
+            if d.get('letter'):
+                letters.add(d['letter'][0].lower())
+        letters.update(['e', 'f', 'g'])
+
+        drive_label = f"{active_disk.get('label', 'External Disk')} ({active_disk.get('letter')})" if active_disk and active_disk.get('letter') else "External Disk"
+
+        # 1. Safely unmount inside both Podman's VM namespace and root WSL only if the VM is running
+        if machine_running:
+            yield f"[-] Unmounting {drive_label} from Podman VM & WSL (/mnt/...)...\n"
+            unmount_cmds = " ; ".join([f"sudo umount -l /mnt/{l} 2>/dev/null" for l in letters])
+            subprocess.run(['podman', 'machine', 'ssh', unmount_cmds], capture_output=True, text=True, **subproc_kwargs())
             for l in letters:
-                # 1. Safely unmount inside WSL
-                subprocess.run(['wsl', '-d', 'podman-machine-default', '-u', 'root', 'umount', f'/mnt/{l}'], capture_output=True, text=True, **subproc_kwargs())
-                # 2. Generically release locks & dismount volume in Windows via Restart Manager & FSCTL_DISMOUNT_VOLUME
-                disk_manager.safely_release_drive(l)
+                subprocess.run(['wsl', '-d', 'podman-machine-default', '-u', 'root', 'umount', '-l', f'/mnt/{l}'], capture_output=True, text=True, **subproc_kwargs())
+
+        # 2. Generically release locks, dismount volume, and spin down physical disk motor
+        if power_down:
+            yield f"[-] Putting {drive_label} into Offline & Standby (Motor Spin-Down) mode...\n"
+        else:
+            yield f"[-] Flushing volume buffers & releasing Windows locks for {drive_label}...\n"
+        any_released = False
+        for l in letters:
+            if disk_manager.safely_release_drive(l, power_down=power_down):
+                any_released = True
+        if any_released:
+            if power_down:
+                yield f"[✓] {drive_label} powered down (Offline / 0 RPM) and protected.\n"
+            else:
+                yield f"[✓] {drive_label} safely unmounted and ready to eject.\n"
     except Exception as e:
         print("Error releasing external mounts:", e)
 
-def stop_all_containers_sync():
-    """Synchronously stops all running PodMedia containers (used on application exit)."""
+def release_external_mounts(power_down=False):
+    """Safely unmounts external drive mounts in WSL and flushes volume buffers when no media_center containers are running."""
+    for _ in release_external_mounts_with_logs(power_down=power_down):
+        pass
+
+STATE_FILE = os.path.join(project_root, 'podmedia.running')
+PLEX_STATE_FILE = os.path.join(project_root, 'plex.running')
+DOWNLOADS_STATE_FILE = os.path.join(project_root, 'downloads.running')
+
+def write_state_file():
+    """Creates the podmedia.running state file in the project root."""
     try:
-        res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
-        if res.returncode == 0:
-            containers = [c.strip() for c in res.stdout.strip().splitlines() if c.strip()]
-            for c in containers:
-                subprocess.run(['podman', 'stop', c], capture_output=True, text=True, **subproc_kwargs())
-        release_external_mounts()
+        with open(STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"status": "running", "pid": os.getpid(), "port": PORT}, f)
+    except Exception:
+        pass
+
+def remove_state_file():
+    """Removes the podmedia.running state file from the project root."""
+    try:
+        if os.path.exists(STATE_FILE):
+            os.remove(STATE_FILE)
+    except Exception:
+        pass
+
+def write_plex_state_file():
+    """Creates the plex.running state file in the project root."""
+    try:
+        with open(PLEX_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"status": "running", "group": "plex"}, f)
+    except Exception:
+        pass
+
+def remove_plex_state_file():
+    """Removes the plex.running state file from the project root."""
+    try:
+        if os.path.exists(PLEX_STATE_FILE):
+            os.remove(PLEX_STATE_FILE)
+    except Exception:
+        pass
+
+def write_downloads_state_file():
+    """Creates the downloads.running state file in the project root."""
+    try:
+        with open(DOWNLOADS_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"status": "running", "group": "downloads"}, f)
+    except Exception:
+        pass
+
+def remove_downloads_state_file():
+    """Removes the downloads.running state file from the project root."""
+    try:
+        if os.path.exists(DOWNLOADS_STATE_FILE):
+            os.remove(DOWNLOADS_STATE_FILE)
+    except Exception:
+        pass
+
+def stop_all_containers_sync(power_down=True):
+    """Synchronously stops all running PodMedia containers and powers down external disks (used on application exit)."""
+    remove_state_file()
+    remove_plex_state_file()
+    remove_downloads_state_file()
+    try:
+        if is_podman_machine_running():
+            res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
+            if res.returncode == 0:
+                containers = [c.strip() for c in res.stdout.strip().splitlines() if c.strip()]
+                if containers:
+                    subprocess.run(['podman', 'stop', '-t', '2'] + containers, capture_output=True, text=True, **subproc_kwargs())
+        release_external_mounts(power_down=power_down)
     except Exception as e:
         print("Error during sync container cleanup:", e)
 
-def stop_all_containers():
+def stop_all_containers(power_down=False):
     """Stops all running PodMedia containers."""
-    for log in ensure_podman_machine():
-        yield log
-    
-    yield "[!] Stopping all PodMedia services...\n"
-    res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
-    if res.returncode == 0:
-        for c in res.stdout.strip().splitlines():
-            c = c.strip()
-            if c:
+    remove_plex_state_file()
+    remove_downloads_state_file()
+    if is_podman_machine_running():
+        yield "[!] Stopping all PodMedia services...\n"
+        res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
+        if res.returncode == 0:
+            running = [c.strip() for c in res.stdout.strip().splitlines() if c.strip()]
+            if not running:
+                yield "[i] No running PodMedia containers found.\n"
+            for c in running:
                 yield f"[-] Stopping: {c}...\n"
                 for log in run_command_generator(f'podman stop {c}'):
                     yield log
-    release_external_mounts()
+    else:
+        yield "[i] Podman machine is already offline.\n"
+    for log in release_external_mounts_with_logs(power_down=power_down):
+        yield log
     yield "\n[✓] ALL SERVICES STOPPED (External disk released)!\n"
 
 def cleanup_empty_dirs(target_dir):
@@ -338,6 +528,8 @@ def start_single_app(app_name):
     """Selectively starts a single application container."""
     for log in ensure_podman_machine():
         yield log
+    for log in ensure_external_mounts():
+        yield log
     for log in ensure_network():
         yield log
 
@@ -360,6 +552,7 @@ def start_single_app(app_name):
         for log in run_command_generator(f'podman-compose up -d {service}', cwd=work_dir):
             yield log
         if app_name == 'plex':
+            write_plex_state_file()
             try:
                 import media_watcher
                 media_watcher.trigger_plex_full_scan_on_startup()
@@ -371,6 +564,8 @@ def start_single_app(app_name):
 
 def stop_single_app(app_name):
     """Selectively stops a single application container."""
+    if app_name == 'plex':
+        remove_plex_state_file()
     for log in ensure_podman_machine():
         yield log
 
@@ -378,5 +573,6 @@ def stop_single_app(app_name):
     yield f"[-] Stopping '{app_name.upper()}' service ({container_name})...\n"
     for log in run_command_generator(f'podman stop {container_name}'):
         yield log
-    release_external_mounts()
+    for log in release_external_mounts_with_logs():
+        yield log
     yield f"\n[✓] '{app_name.upper()}' STOPPED SUCCESSFULLY!\n"

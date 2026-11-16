@@ -60,6 +60,7 @@ def run_setup():
     # Read active paths from config.properties
     cfg = configparser.ConfigParser()
     cfg.read(config_file)
+    server_port = cfg.getint("server", "port", fallback=3000)
     raw_media_dir = cfg.get("paths", "media_dir", fallback="./media")
     raw_downloads_dir = cfg.get("paths", "downloads_dir", fallback="./downloads")
 
@@ -138,23 +139,181 @@ def run_setup():
             kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
         return kwargs
 
-    # 4. Podman Machine Health
-    print("\n[4/5] Checking Podman VM Health...")
+    # 4. Podman Health / VM Check
+    print("\n[4/5] Checking Podman Health...")
+    system_os = platform.system()
     res = subprocess.run(["podman", "info"], capture_output=True, text=True, **subproc_kwargs())
     if res.returncode != 0:
-        print(" [!] Podman machine is offline. Attempting start...")
-        subprocess.run(["podman", "machine", "start"], **subproc_kwargs())
+        if system_os == "Linux":
+            print(" [!] Podman is not ready. Attempting to start user podman.socket...")
+            subprocess.run(["systemctl", "--user", "start", "podman.socket"], capture_output=True, text=True)
+        else:
+            print(" [!] Podman machine is offline. Attempting start...")
+            subprocess.run(["podman", "machine", "start"], **subproc_kwargs())
     else:
-        print(" [✓] Podman VM is active and running.")
+        print(" [✓] Podman is active and running.")
 
     # 5. OS-Specific Launcher & Stopper Script Generation
     print("\n[5/5] Generating OS-Specific Launcher & Stopper Scripts...")
-    system_os = platform.system()
     if system_os == "Windows":
+        pythonw_exe = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
+        if not os.path.exists(pythonw_exe):
+            pythonw_exe = sys.executable
+        app_py_path = os.path.join(base_dir, "app", "app.py")
+
+        # Register user-session scheduled tasks so Windows Services (e.g. Homebridge LocalSystem)
+        # can trigger PodMedia inside the interactive user's WSL/Podman session without UAC prompts.
+        try:
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_Start", "/TR", f'"{pythonw_exe}" "{app_py_path}"', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_StartPlex", "/TR", f'"{pythonw_exe}" "{app_py_path}" --start-plex', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_StopPlex", "/TR", f'"{pythonw_exe}" "{app_py_path}" --stop-plex', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_StartDownloads", "/TR", f'"{pythonw_exe}" "{app_py_path}" --start-downloads', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_StopDownloads", "/TR", f'"{pythonw_exe}" "{app_py_path}" --stop-downloads', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_Stop", "/TR", f'"{pythonw_exe}" "{app_py_path}" --stop', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            print(" [✓] Registered Windows Scheduled Tasks: 'PodMedia_Start', 'PodMedia_StartPlex', 'PodMedia_StopPlex', 'PodMedia_StartDownloads', 'PodMedia_StopDownloads', 'PodMedia_Stop'")
+        except Exception as e:
+            print(" [!] Note: Scheduled task registration skipped:", e)
+
         launcher_path = os.path.join(base_dir, "start.bat")
+        start_bat_content = (
+            "@echo off\n"
+            "if not exist \"%~dp0podmedia.running\" echo {\"status\":\"starting\"} > \"%~dp0podmedia.running\"\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/ping >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            f"    start \"\" http://localhost:{server_port}\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_Start\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_Start\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\"\n"
+            ")\n"
+            "exit /b 0\n"
+        )
         with open(launcher_path, "w", encoding="utf-8") as f:
-            f.write("@echo off\nstart \"\" pythonw app\\app.py\n")
+            f.write(start_bat_content)
         print(" [✓] Created Windows launcher: 'start.bat'")
+
+        plex_launcher_path = os.path.join(base_dir, "start_plex.bat")
+        start_plex_bat_content = (
+            "@echo off\n"
+            "if not exist \"%~dp0podmedia.running\" echo {\"status\":\"starting\"} > \"%~dp0podmedia.running\"\n"
+            "if not exist \"%~dp0plex.running\" echo {\"status\":\"starting\"} > \"%~dp0plex.running\"\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostart/plex >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_StartPlex\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_StartPlex\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\" --start-plex\n"
+            ")\n"
+            "exit /b 0\n"
+        )
+        with open(plex_launcher_path, "w", encoding="utf-8") as f:
+            f.write(start_plex_bat_content)
+        print(" [✓] Created Windows Plex-only launcher: 'start_plex.bat'")
+
+        plex_stopper_path = os.path.join(base_dir, "stop_plex.bat")
+        stop_plex_bat_content = (
+            "@echo off\n"
+            "if exist \"%~dp0plex.running\" del /f /q \"%~dp0plex.running\" >nul 2>&1\n"
+            "if not exist \"%~dp0downloads.running\" (\n"
+            "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
+            ")\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/plex >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_StopPlex\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_StopPlex\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\" --stop-plex\n"
+            ")\n"
+            "exit /b 0\n"
+        )
+        with open(plex_stopper_path, "w", encoding="utf-8") as f:
+            f.write(stop_plex_bat_content)
+        print(" [✓] Created Windows Plex stopper: 'stop_plex.bat'")
+
+        downloads_launcher_path = os.path.join(base_dir, "start_downloads.bat")
+        start_downloads_bat_content = (
+            "@echo off\n"
+            "if not exist \"%~dp0podmedia.running\" echo {\"status\":\"starting\"} > \"%~dp0podmedia.running\"\n"
+            "if not exist \"%~dp0downloads.running\" echo {\"status\":\"starting\"} > \"%~dp0downloads.running\"\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostart/downloads >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_StartDownloads\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_StartDownloads\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\" --start-downloads\n"
+            ")\n"
+            "exit /b 0\n"
+        )
+        with open(downloads_launcher_path, "w", encoding="utf-8") as f:
+            f.write(start_downloads_bat_content)
+        print(" [✓] Created Windows Downloads launcher: 'start_downloads.bat'")
+
+        downloads_stopper_path = os.path.join(base_dir, "stop_downloads.bat")
+        stop_downloads_bat_content = (
+            "@echo off\n"
+            "if exist \"%~dp0downloads.running\" del /f /q \"%~dp0downloads.running\" >nul 2>&1\n"
+            "if not exist \"%~dp0plex.running\" (\n"
+            "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
+            ")\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/downloads >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_StopDownloads\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_StopDownloads\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\" --stop-downloads\n"
+            ")\n"
+            "exit /b 0\n"
+        )
+        with open(downloads_stopper_path, "w", encoding="utf-8") as f:
+            f.write(stop_downloads_bat_content)
+        print(" [✓] Created Windows Downloads stopper: 'stop_downloads.bat'")
+
+        status_path = os.path.join(base_dir, "status.bat")
+        status_content = (
+            "@echo off\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/ping >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    echo 0\n"
+            "    exit /b 0\n"
+            ") else (\n"
+            "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
+            "    if exist \"%~dp0plex.running\" del /f /q \"%~dp0plex.running\" >nul 2>&1\n"
+            "    if exist \"%~dp0downloads.running\" del /f /q \"%~dp0downloads.running\" >nul 2>&1\n"
+            "    echo 1\n"
+            "    exit /b 1\n"
+            ")\n"
+        )
+        with open(status_path, "w", encoding="utf-8") as f:
+            f.write(status_content)
+        print(" [✓] Created Windows status checker: 'status.bat'")
 
         stopper_path = os.path.join(base_dir, "stop.bat")
         stop_content = (
@@ -164,6 +323,14 @@ def run_setup():
             "echo   PodMedia - Servisleri ve Konteynerleri Durdur\n"
             "echo ==================================================\n"
             "echo.\n\n"
+            "if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
+            "if exist \"%~dp0plex.running\" del /f /q \"%~dp0plex.running\" >nul 2>&1\n"
+            "if exist \"%~dp0downloads.running\" del /f /q \"%~dp0downloads.running\" >nul 2>&1\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/system/quit >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    echo [OK] PodMedia kapatma ve disk ayirma islemi baslatildi.\n"
+            "    exit /b 0\n"
+            ")\n\n"
             "echo [1/3] PodMedia konteynerleri durduruluyor...\n"
             "for /f \"tokens=*\" %%i in ('podman ps -q --filter \"name=media_center_\"') do (\n"
             "    echo   - Durduruluyor: %%i\n"
@@ -175,11 +342,12 @@ def run_setup():
             "wsl -d podman-machine-default -u root umount /mnt/e >nul 2>&1\n"
             "wsl -d podman-machine-default -u root umount /mnt/f >nul 2>&1\n"
             "wsl -d podman-machine-default -u root umount /mnt/g >nul 2>&1\n"
-            "python -c \"import sys; sys.path.append('app'); from disk_manager import disk_manager; disk_manager.release_all_external_drives()\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_Stop\" >nul 2>&1\n"
+            f"\"{sys.executable}\" -c \"import sys; sys.path.append('app'); from disk_manager import disk_manager; disk_manager.release_all_external_drives()\" >nul 2>&1\n"
             "echo   [OK] Harici disk baglantilari ve kilitleri guvenle ayrildi.\n\n"
             "echo.\n"
             "echo [3/3] PodMedia web sunucusu ve arka plan surecleri kapatiliyor...\n"
-            "for /f \"tokens=5\" %%a in ('netstat -aon ^| findstr :3000 ^| findstr LISTENING') do (\n"
+            f"for /f \"tokens=5\" %%a in ('netstat -aon ^| findstr :{server_port} ^| findstr LISTENING') do (\n"
             "    taskkill /F /PID %%a >nul 2>&1\n"
             ")\n"
             "powershell -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like '*app\\app.py*' -or $_.CommandLine -like '*app/app.py*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\" >nul 2>&1\n"
@@ -189,8 +357,6 @@ def run_setup():
             "echo   [OK] PodMedia basariyla kapatildi!\n"
             "echo   [OK] Harici disk serbest birakildi (guvenle cikarilabilir).\n"
             "echo ==================================================\n"
-            "echo.\n"
-            "ping 127.0.0.1 -n 3 >nul\n"
             "exit /b 0\n"
         )
         with open(stopper_path, "w", encoding="utf-8") as f:
@@ -198,57 +364,109 @@ def run_setup():
         print(" [✓] Created Windows stopper: 'stop.bat'")
         launch_msg = (
             "Run '.\\start.bat' or double-click 'start.bat' to launch PodMedia.\n"
+            " Run '.\\start_plex.bat' / '.\\stop_plex.bat' to control Plex mode.\n"
+            " Run '.\\start_downloads.bat' / '.\\stop_downloads.bat' to control Downloads mode.\n"
             " Run '.\\stop.bat' or double-click 'stop.bat' to stop PodMedia & release external drives."
         )
     else:
-        launcher_path = os.path.join(base_dir, "start.sh")
-        with open(launcher_path, "w", encoding="utf-8") as f:
-            f.write("#!/usr/bin/env bash\npython3 app/app.py &\n")
-        try:
-            os.chmod(launcher_path, 0o755)
-        except Exception:
-            pass
+        python_exe = sys.executable or "python3"
+
+        def write_sh(filename, content):
+            s_path = os.path.join(base_dir, filename)
+            with open(s_path, "w", encoding="utf-8", newline="\n") as f:
+                f.write(content)
+            try:
+                os.chmod(s_path, 0o755)
+            except Exception:
+                pass
+            return s_path
+
+        start_sh_content = (
+            "#!/usr/bin/env bash\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            "[ ! -f \"$SCRIPT_DIR/podmedia.running\" ] && echo '{\"status\":\"starting\"}' > \"$SCRIPT_DIR/podmedia.running\"\n"
+            f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/ping >/dev/null 2>&1; then\n"
+            "    exit 0\n"
+            "fi\n"
+            f"nohup \"{python_exe}\" \"$SCRIPT_DIR/app/app.py\" >/dev/null 2>&1 &\n"
+            "exit 0\n"
+        )
+        write_sh("start.sh", start_sh_content)
         print(" [✓] Created Unix launcher: 'start.sh' (chmod +x)")
 
-        stopper_path = os.path.join(base_dir, "stop.sh")
+        for mode in ("plex", "downloads"):
+            other_mode = "downloads" if mode == "plex" else "plex"
+            start_mode_sh = (
+                "#!/usr/bin/env bash\n"
+                "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+                "[ ! -f \"$SCRIPT_DIR/podmedia.running\" ] && echo '{\"status\":\"starting\"}' > \"$SCRIPT_DIR/podmedia.running\"\n"
+                f"[ ! -f \"$SCRIPT_DIR/{mode}.running\" ] && echo '{{\"status\":\"starting\"}}' > \"$SCRIPT_DIR/{mode}.running\"\n"
+                f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostart/{mode} >/dev/null 2>&1; then\n"
+                "    exit 0\n"
+                "fi\n"
+                f"nohup \"{python_exe}\" \"$SCRIPT_DIR/app/app.py\" --start-{mode} >/dev/null 2>&1 &\n"
+                "exit 0\n"
+            )
+            write_sh(f"start_{mode}.sh", start_mode_sh)
+            print(f" [✓] Created Unix script: 'start_{mode}.sh' (chmod +x)")
+
+            stop_mode_sh = (
+                "#!/usr/bin/env bash\n"
+                "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+                f"rm -f \"$SCRIPT_DIR/{mode}.running\"\n"
+                f"if [ ! -f \"$SCRIPT_DIR/{other_mode}.running\" ]; then\n"
+                "    rm -f \"$SCRIPT_DIR/podmedia.running\"\n"
+                "fi\n"
+                f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/{mode} >/dev/null 2>&1; then\n"
+                "    exit 0\n"
+                "fi\n"
+                f"nohup \"{python_exe}\" \"$SCRIPT_DIR/app/app.py\" --stop-{mode} >/dev/null 2>&1 &\n"
+                "exit 0\n"
+            )
+            write_sh(f"stop_{mode}.sh", stop_mode_sh)
+            print(f" [✓] Created Unix script: 'stop_{mode}.sh' (chmod +x)")
+
+        status_sh_content = (
+            "#!/usr/bin/env bash\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/ping >/dev/null 2>&1; then\n"
+            "    echo 0\n"
+            "    exit 0\n"
+            "else\n"
+            "    rm -f \"$SCRIPT_DIR/podmedia.running\" \"$SCRIPT_DIR/plex.running\" \"$SCRIPT_DIR/downloads.running\"\n"
+            "    echo 1\n"
+            "    exit 1\n"
+            "fi\n"
+        )
+        write_sh("status.sh", status_sh_content)
+        print(" [✓] Created Unix status checker: 'status.sh' (chmod +x)")
+
         stop_sh_content = (
             "#!/usr/bin/env bash\n"
-            "# PodMedia Stop Script\n\n"
-            "echo \"==================================================\"\n"
-            "echo \"  PodMedia - Servisleri ve Konteynerleri Durdur\"\n"
-            "echo \"==================================================\"\n"
-            "echo \"\"\n\n"
-            "echo \"[1/3] PodMedia konteynerleri durduruluyor...\"\n"
+            "# PodMedia Stop Script\n"
+            "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
+            "rm -f \"$SCRIPT_DIR/podmedia.running\" \"$SCRIPT_DIR/plex.running\" \"$SCRIPT_DIR/downloads.running\"\n\n"
+            f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/system/quit >/dev/null 2>&1; then\n"
+            "    echo \"[OK] PodMedia shutdown initiated.\"\n"
+            "    exit 0\n"
+            "fi\n\n"
+            "echo \"[1/3] Stopping PodMedia containers...\"\n"
             "podman ps -q --filter \"name=media_center_\" | while read -r c; do\n"
-            "    echo \"  - Durduruluyor: $c\"\n"
-            "    podman stop \"$c\" >/dev/null 2>&1\n"
+            "    [ -n \"$c\" ] && podman stop \"$c\" >/dev/null 2>&1\n"
             "done\n"
-            "echo \"  [OK] Tum konteynerler durduruldu.\"\n\n"
-            "echo \"\"\n"
-            "echo \"[2/3] Harici disk baglantilari serbest birakiliyor (WSL)...\"\n"
-            "wsl -d podman-machine-default -u root umount /mnt/e >/dev/null 2>&1 || true\n"
-            "wsl -d podman-machine-default -u root umount /mnt/f >/dev/null 2>&1 || true\n"
-            "wsl -d podman-machine-default -u root umount /mnt/g >/dev/null 2>&1 || true\n"
-            "echo \"  [OK] Harici disk mountlari serbest birakildi.\"\n\n"
-            "echo \"\"\n"
-            "echo \"[3/3] PodMedia web sunucusu ve arka plan surecleri kapatiliyor...\"\n"
-            "powershell.exe -NoProfile -Command \"Get-CimInstance Win32_Process | Where-Object { \\$_.CommandLine -like '*app\\app.py*' -or \\$_.CommandLine -like '*app/app.py*' } | ForEach-Object { Stop-Process -Id \\$_.ProcessId -Force }\" >/dev/null 2>&1 || true\n"
-            "echo \"  [OK] Web sunucusu kapatildi.\"\n\n"
-            "echo \"\"\n"
-            "echo \"==================================================\"\n"
-            "echo \"  [OK] PodMedia basariyla kapatildi!\"\n"
-            "echo \"  [OK] Harici disk serbest birakildi.\"\n"
-            "echo \"==================================================\"\n"
+            "echo \"[2/3] Releasing external drive mounts (if any)...\"\n"
+            f"\"{python_exe}\" -c \"import sys; sys.path.append('$SCRIPT_DIR/app'); from disk_manager import disk_manager; disk_manager.release_all_external_drives()\" >/dev/null 2>&1 || true\n"
+            "echo \"[3/3] Stopping PodMedia background server...\"\n"
+            "pkill -f \"app/app.py\" >/dev/null 2>&1 || true\n"
+            "echo \"[OK] PodMedia stopped.\"\n"
+            "exit 0\n"
         )
-        with open(stopper_path, "w", encoding="utf-8") as f:
-            f.write(stop_sh_content)
-        try:
-            os.chmod(stopper_path, 0o755)
-        except Exception:
-            pass
+        write_sh("stop.sh", stop_sh_content)
         print(" [✓] Created Unix stopper: 'stop.sh' (chmod +x)")
         launch_msg = (
             "Run './start.sh' to launch PodMedia.\n"
+            " Run './start_plex.sh' / './stop_plex.sh' to control Plex mode.\n"
+            " Run './start_downloads.sh' / './stop_downloads.sh' to control Downloads mode.\n"
             " Run './stop.sh' to stop PodMedia & release external drives."
         )
 

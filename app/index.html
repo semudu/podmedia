@@ -1252,24 +1252,69 @@
             };
         }
 
-        async function quitPodMedia() {
+        function quitPodMedia() {
             if (!confirm("PodMedia'yı ve tüm çalışan servisleri durdurup harici diski serbest bırakmak istiyor musunuz?")) {
                 return;
             }
-            try {
-                const res = await fetch('/api/system/quit');
-                document.body.innerHTML = `
-                    <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; background:#0f172a; color:#f8fafc; font-family:sans-serif; text-align:center; padding: 20px;">
-                        <h1 style="font-size:2.2rem; margin-bottom:1rem;">🛑 PodMedia Kapatıldı</h1>
-                        <p style="color:#94a3b8; font-size:1.15rem; max-width:550px; line-height:1.6;">
-                            Tüm servisler durduruldu, WSL mount bağlantıları çözüldü ve harici disk başarıyla serbest bırakıldı.<br><br>
-                            Diskinizi artık güvenle çıkarabilir veya bu tarayıcı sekmesini kapatabilirsiniz.
-                        </p>
-                    </div>
-                `;
-            } catch (e) {
-                alert("PodMedia kapatıldı veya bağlantı sonlandı.");
+
+            const modal = document.getElementById('modal-overlay');
+            const terminal = document.getElementById('terminal-out');
+            const progressFill = document.getElementById('progress-fill');
+            const title = document.getElementById('modal-title');
+
+            title.innerText = '⏻ PodMedia Kapatılıyor...';
+            terminal.innerText = 'Kapatma işlemi başlatıldı, servisler durduruluyor...\n';
+            progressFill.style.width = '15%';
+            progressFill.style.backgroundColor = '#f43f5e';
+            modal.style.display = 'flex';
+
+            if (eventSource) {
+                eventSource.close();
             }
+
+            eventSource = new EventSource('/api/stream?action=quit-all&target=');
+            let stepCount = 0;
+
+            const finalizeShutdown = async () => {
+                if (window.statusPollTimer) {
+                    clearInterval(window.statusPollTimer);
+                }
+                terminal.innerText += '[+] PodMedia web sunucusu kapatılıyor...\n';
+                terminal.innerText += '[✓] PODMEDIA KAPATILDI — Harici diskinizi güvenle çıkarabilirsiniz.\n';
+                terminal.scrollTop = terminal.scrollHeight;
+                progressFill.style.width = '100%';
+                progressFill.style.backgroundColor = '#22c55e';
+                title.innerText = '🛑 PodMedia Kapatıldı (Harici Disk Serbest)';
+
+                try {
+                    await fetch('/api/system/quit');
+                } catch (e) {
+                    // Expected if server exits immediately
+                }
+            };
+
+            eventSource.onmessage = function(event) {
+                const data = event.data;
+
+                if (data === '[DONE]') {
+                    eventSource.close();
+                    finalizeShutdown();
+                    return;
+                }
+
+                stepCount++;
+                let currentPercent = Math.min(15 + (stepCount * 8), 92);
+                progressFill.style.width = `${currentPercent}%`;
+
+                terminal.innerText += data + '\n';
+                terminal.scrollTop = terminal.scrollHeight;
+            };
+
+            eventSource.onerror = function(err) {
+                console.error("SSE Quit Streaming error:", err);
+                eventSource.close();
+                finalizeShutdown();
+            };
         }
 
         /* EXTERNAL STORAGE & HYBRID TRANSFER LOGIC */
@@ -1566,7 +1611,7 @@
 
         updateDynamicServiceLinks();
         fetchStatus();
-        setInterval(fetchStatus, 2000);
+        window.statusPollTimer = setInterval(fetchStatus, 2000);
     </script>
 </body>
 </html>

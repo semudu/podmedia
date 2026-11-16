@@ -28,6 +28,26 @@ def _get_api_key(xml_path):
         pass
     return None
 
+def _api_request(base_url, api_key, endpoint, method="GET", payload=None):
+    url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
+    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    headers = {"X-Api-Key": api_key}
+    if data is not None:
+        headers["Content-Type"] = "application/json"
+    req = urllib.request.Request(url, data=data, headers=headers, method=method)
+    with urllib.request.urlopen(req, timeout=4) as resp:
+        raw = resp.read()
+        return json.loads(raw.decode("utf-8")) if raw else None
+
+def _is_service_online(base_url, api_key):
+    if not api_key:
+        return False
+    try:
+        _api_request(base_url, api_key, "/api/v3/system/status")
+        return True
+    except Exception:
+        return False
+
 def trigger_radarr_command(name, body=None):
     """Sends a command to Radarr REST API if container is currently active."""
     api_key = _get_api_key(os.path.join(RADARR_DIR, "config.xml"))
@@ -83,6 +103,77 @@ def sync_radarr(external_movies_path=None, local_movies_path=None):
         local_movies_path = os.path.join(LOCAL_MEDIA_DIR, "movies")
 
     updated_count = 0
+    api_key = _get_api_key(os.path.join(RADARR_DIR, "config.xml"))
+    base_url = "http://localhost:7878"
+
+    # When Radarr container is running, use REST API to avoid Windows-vs-WSL2 SQLite WAL lock conflicts
+    if _is_service_online(base_url, api_key):
+        try:
+            ext_folders = set()
+            if external_movies_path and os.path.exists(external_movies_path):
+                try:
+                    ext_folders = {f for f in os.listdir(external_movies_path) if os.path.isdir(os.path.join(external_movies_path, f))}
+                except Exception:
+                    pass
+
+            local_folders = set()
+            if os.path.exists(local_movies_path):
+                try:
+                    local_folders = {f for f in os.listdir(local_movies_path) if os.path.isdir(os.path.join(local_movies_path, f))}
+                except Exception:
+                    pass
+
+            movies = _api_request(base_url, api_key, "/api/v3/movie") or []
+            for m in movies:
+                m_path = m.get("path", "")
+                folder = m_path.rstrip("/").split("/")[-1] if m_path else ""
+                changed = False
+
+                if folder in ext_folders and m_path == f"/movies/{folder}":
+                    m["path"] = f"/movies_external/{folder}"
+                    changed = True
+                elif folder in local_folders and m_path == f"/movies_external/{folder}":
+                    m["path"] = f"/movies/{folder}"
+                    changed = True
+
+                # Check if deleted from mounted disk
+                cur_path = m.get("path", "")
+                host_path = None
+                is_drive_mounted = False
+                if cur_path.startswith("/movies_external/"):
+                    if external_movies_path and os.path.exists(external_movies_path):
+                        rel = cur_path.replace("/movies_external/", "").strip("/")
+                        host_path = os.path.join(external_movies_path, rel)
+                        is_drive_mounted = True
+                elif cur_path.startswith("/movies/"):
+                    rel = cur_path.replace("/movies/", "").strip("/")
+                    host_path = os.path.join(local_movies_path, rel)
+                    is_drive_mounted = True
+
+                if is_drive_mounted and host_path and not os.path.exists(host_path):
+                    if m.get("monitored") or m.get("movieFileId", 0) != 0:
+                        print(f"🗑️ [RadarrSync] Movie deleted from disk: '{folder}'. Unmonitoring in Radarr...")
+                        m["monitored"] = False
+                        changed = True
+                        mf_id = m.get("movieFileId", 0)
+                        if mf_id:
+                            try:
+                                _api_request(base_url, api_key, f"/api/v3/moviefile/{mf_id}", method="DELETE")
+                            except Exception:
+                                pass
+
+                if changed:
+                    _api_request(base_url, api_key, f"/api/v3/movie/{m['id']}", method="PUT", payload=m)
+                    updated_count += 1
+
+            if updated_count > 0:
+                print(f"🎬 [RadarrSync] Updated {updated_count} movies via Radarr API.")
+                trigger_radarr_command("DownloadedMoviesScan")
+            return updated_count
+        except Exception as e:
+            print("Error during Radarr API sync:", e)
+            return updated_count
+
     try:
         con = sqlite3.connect(db_path, timeout=5)
         cur = con.cursor()
@@ -175,6 +266,70 @@ def sync_sonarr(external_series_path=None, local_series_path=None):
         local_series_path = os.path.join(LOCAL_MEDIA_DIR, "series")
 
     updated_count = 0
+    api_key = _get_api_key(os.path.join(SONARR_DIR, "config.xml"))
+    base_url = "http://localhost:8989"
+
+    # When Sonarr container is running, use REST API to avoid Windows-vs-WSL2 SQLite WAL lock conflicts
+    if _is_service_online(base_url, api_key):
+        try:
+            ext_folders = set()
+            if external_series_path and os.path.exists(external_series_path):
+                try:
+                    ext_folders = {f for f in os.listdir(external_series_path) if os.path.isdir(os.path.join(external_series_path, f))}
+                except Exception:
+                    pass
+
+            local_folders = set()
+            if os.path.exists(local_series_path):
+                try:
+                    local_folders = {f for f in os.listdir(local_series_path) if os.path.isdir(os.path.join(local_series_path, f))}
+                except Exception:
+                    pass
+
+            series_list = _api_request(base_url, api_key, "/api/v3/series") or []
+            for s in series_list:
+                s_path = s.get("path", "")
+                folder = s_path.rstrip("/").split("/")[-1] if s_path else ""
+                changed = False
+
+                if folder in ext_folders and s_path in (f"/tv/{folder}", f"/series/{folder}"):
+                    s["path"] = f"/tv_external/{folder}"
+                    changed = True
+                elif folder in local_folders and s_path in (f"/tv_external/{folder}", f"/series_external/{folder}"):
+                    s["path"] = f"/tv/{folder}"
+                    changed = True
+
+                cur_path = s.get("path", "")
+                host_path = None
+                is_drive_mounted = False
+                if cur_path.startswith("/series_external/") or cur_path.startswith("/tv_external/"):
+                    if external_series_path and os.path.exists(external_series_path):
+                        rel = cur_path.replace("/series_external/", "").replace("/tv_external/", "").strip("/")
+                        host_path = os.path.join(external_series_path, rel)
+                        is_drive_mounted = True
+                elif cur_path.startswith("/series/") or cur_path.startswith("/tv/"):
+                    rel = cur_path.replace("/series/", "").replace("/tv/", "").strip("/")
+                    host_path = os.path.join(local_series_path, rel)
+                    is_drive_mounted = True
+
+                if is_drive_mounted and host_path and not os.path.exists(host_path):
+                    if s.get("monitored"):
+                        print(f"🗑️ [SonarrSync] Series deleted from disk: '{folder}'. Unmonitoring in Sonarr...")
+                        s["monitored"] = False
+                        changed = True
+
+                if changed:
+                    _api_request(base_url, api_key, f"/api/v3/series/{s['id']}", method="PUT", payload=s)
+                    updated_count += 1
+
+            if updated_count > 0:
+                print(f"📺 [SonarrSync] Updated {updated_count} series via Sonarr API.")
+                trigger_sonarr_command("RescanSeries")
+            return updated_count
+        except Exception as e:
+            print("Error during Sonarr API sync:", e)
+            return updated_count
+
     try:
         con = sqlite3.connect(db_path, timeout=5)
         cur = con.cursor()

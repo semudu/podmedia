@@ -6,5 +6,5 @@
 # 1. Install "Get cookies.txt LOCALLY" browser extension in Chrome/Edge/Firefox.
 # 2. Go to https://www.youtube.com
 # 3. Click the extension icon and export your cookies.
-# 4. Save the exported text into this file: D:\media_center\services\tools\metube\cookies.txt
+# 4. Save the exported text into this file: services/tools/metube/cookies.txt
 # 5. Restart MeTube or start a download - 403 Forbidden errors will be solved!

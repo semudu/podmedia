@@ -167,16 +167,159 @@ class DiskManager:
             }
         }
 
-    def safely_release_drive(self, drive_letter):
+    def _send_scsi_start_stop(self, handle, start=False):
+        """Sends SCSI SYNCHRONIZE CACHE (0x35) and START STOP UNIT (0x1B) via IOCTL_SCSI_PASS_THROUGH_DIRECT."""
+        try:
+            from ctypes import wintypes
+            IOCTL_SCSI_PASS_THROUGH_DIRECT = 0x0004D014
+
+            class SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER(ctypes.Structure):
+                _fields_ = [
+                    ('Length', wintypes.USHORT),
+                    ('ScsiStatus', ctypes.c_ubyte),
+                    ('PathId', ctypes.c_ubyte),
+                    ('TargetId', ctypes.c_ubyte),
+                    ('Lun', ctypes.c_ubyte),
+                    ('CdbLength', ctypes.c_ubyte),
+                    ('SenseInfoLength', ctypes.c_ubyte),
+                    ('DataIn', ctypes.c_ubyte),
+                    ('DataTransferLength', wintypes.ULONG),
+                    ('TimeOutValue', wintypes.ULONG),
+                    ('DataBuffer', ctypes.c_void_p),
+                    ('SenseInfoOffset', wintypes.ULONG),
+                    ('Cdb', ctypes.c_ubyte * 16),
+                    ('Filler', wintypes.ULONG),
+                    ('SenseBuf', ctypes.c_ubyte * 32)
+                ]
+
+            struct_len = 56 if ctypes.sizeof(ctypes.c_void_p) == 8 else 44
+            bytes_ret = wintypes.DWORD()
+
+            if not start:
+                # 1. Flush hardware disk cache: SYNCHRONIZE CACHE (10) = 0x35
+                sync_cmd = SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER()
+                sync_cmd.Length = struct_len
+                sync_cmd.CdbLength = 10
+                sync_cmd.SenseInfoLength = 32
+                sync_cmd.DataIn = 1
+                sync_cmd.TimeOutValue = 10
+                sync_cmd.SenseInfoOffset = SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER.SenseBuf.offset
+                sync_cmd.Cdb[0] = 0x35
+                self.kernel32.DeviceIoControl(
+                    handle, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+                    ctypes.byref(sync_cmd), ctypes.sizeof(sync_cmd),
+                    ctypes.byref(sync_cmd), ctypes.sizeof(sync_cmd),
+                    ctypes.byref(bytes_ret), None
+                )
+
+            # 2. START STOP UNIT = 0x1B (Start=1 spins up, Start=0 parks heads & spins down motor)
+            sptd = SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER()
+            sptd.Length = struct_len
+            sptd.CdbLength = 6
+            sptd.SenseInfoLength = 32
+            sptd.DataIn = 1
+            sptd.TimeOutValue = 15
+            sptd.SenseInfoOffset = SCSI_PASS_THROUGH_DIRECT_WITH_BUFFER.SenseBuf.offset
+            sptd.Cdb[0] = 0x1B
+            sptd.Cdb[1] = 0x00 if start else 0x01  # Immed=1 on stop, wait for spin-up on start
+            sptd.Cdb[4] = 0x01 if start else 0x00  # Start=1 (spin up) or Start=0 (spin down / standby)
+
+            res = self.kernel32.DeviceIoControl(
+                handle, IOCTL_SCSI_PASS_THROUGH_DIRECT,
+                ctypes.byref(sptd), ctypes.sizeof(sptd),
+                ctypes.byref(sptd), ctypes.sizeof(sptd),
+                ctypes.byref(bytes_ret), None
+            )
+            return bool(res)
+        except Exception:
+            return False
+
+    def wake_drive(self, drive_letter):
+        """Brings an offline volume back online and spins up its motor without unplugging USB."""
+        if os.name != 'nt' or not drive_letter:
+            return False
+
+        clean_letter = drive_letter[0].upper()
+        volume_path = f"\\\\.\\{clean_letter}:"
+        try:
+            from ctypes import wintypes
+            GENERIC_READ = 0x80000000
+            GENERIC_WRITE = 0x40000000
+            FILE_SHARE_READ = 1
+            FILE_SHARE_WRITE = 2
+            OPEN_EXISTING = 3
+            IOCTL_VOLUME_ONLINE = 0x0056C008
+
+            h = self.kernel32.CreateFileW(
+                volume_path,
+                GENERIC_READ | GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                None,
+                OPEN_EXISTING,
+                0,
+                None
+            )
+            if h != -1:
+                bytes_ret = wintypes.DWORD()
+                self._send_scsi_start_stop(h, start=True)
+                self.kernel32.DeviceIoControl(h, IOCTL_VOLUME_ONLINE, None, 0, None, 0, ctypes.byref(bytes_ret), None)
+                self.kernel32.CloseHandle(h)
+                try:
+                    os.path.exists(f"{clean_letter}:\\")
+                except Exception:
+                    pass
+                return True
+        except Exception:
+            pass
+        return False
+
+    def wake_all_external_drives(self):
+        """Scans attached non-system drive letters and brings any offline volumes back online."""
+        if not self.kernel32:
+            return
+        bitmask = self.kernel32.GetLogicalDrives()
+        app_drive = os.path.splitdrive(self.project_root)[0].upper()
+        sys_drive = os.environ.get('SystemDrive', 'C:').upper()
+
+        for i in range(26):
+            if bitmask & (1 << i):
+                letter = f"{chr(65 + i)}:"
+                root = letter + "\\"
+                drive_type = self.kernel32.GetDriveTypeW(root)
+                if drive_type in (2, 3) and letter != sys_drive and letter != app_drive:
+                    vol_buf = ctypes.create_unicode_buffer(1024)
+                    fs_buf = ctypes.create_unicode_buffer(1024)
+                    serial = ctypes.c_ulong()
+                    res = self.kernel32.GetVolumeInformationW(
+                        root, vol_buf, ctypes.sizeof(vol_buf),
+                        ctypes.byref(serial), None, None,
+                        fs_buf, ctypes.sizeof(fs_buf)
+                    )
+                    if not res:
+                        # Volume is present in logical drives bitmask but offline/unmounted -> wake it up
+                        self.wake_drive(letter)
+
+    def safely_release_drive(self, drive_letter, power_down=False):
         """
-        Generically releases locks and dismounts an external/secondary drive volume.
+        Generically releases locks, dismounts an external drive volume, and optionally puts it offline & spins down motor.
         1. Uses Windows Restart Manager API to identify and close any processes locking the drive path.
-        2. Calls FSCTL_DISMOUNT_VOLUME via DeviceIoControl to flush dirty buffers and dismount the filesystem.
+        2. Flushes buffers, optionally sets volume offline (IOCTL_VOLUME_OFFLINE), dismounts (FSCTL_DISMOUNT_VOLUME),
+           and sends SCSI START STOP UNIT (standby/spin-down) so the physical disk stops spinning while USB stays plugged in.
         """
         if os.name != 'nt' or not drive_letter:
             return False
 
         clean_letter = drive_letter[0].upper()
+        if self.kernel32:
+            bitmask = self.kernel32.GetLogicalDrives()
+            drive_idx = ord(clean_letter) - 65
+            if drive_idx < 0 or drive_idx >= 26 or not (bitmask & (1 << drive_idx)):
+                return False
+            app_drive = os.path.splitdrive(self.project_root)[0].upper()
+            sys_drive = os.environ.get('SystemDrive', 'C:').upper()
+            if f"{clean_letter}:" in (sys_drive, app_drive):
+                return False
+
         volume_path = f"\\\\.\\{clean_letter}:"
 
         # 1. Close processes locking paths on this drive via Windows Restart Manager
@@ -234,7 +377,7 @@ class DiskManager:
         except Exception:
             pass
 
-        # 2. Tell filesystem driver to flush buffers and dismount the volume
+        # 2. Flush buffers, dismount filesystem, optionally take volume offline & spin down physical motor
         try:
             from ctypes import wintypes
             GENERIC_READ = 0x80000000
@@ -243,6 +386,7 @@ class DiskManager:
             FILE_SHARE_WRITE = 2
             OPEN_EXISTING = 3
             FSCTL_DISMOUNT_VOLUME = 0x00090020
+            IOCTL_VOLUME_OFFLINE = 0x0056C00C
 
             h = self.kernel32.CreateFileW(
                 volume_path,
@@ -255,15 +399,19 @@ class DiskManager:
             )
             if h != -1:
                 bytes_ret = wintypes.DWORD()
+                self.kernel32.FlushFileBuffers(h)
+                if power_down:
+                    self.kernel32.DeviceIoControl(h, IOCTL_VOLUME_OFFLINE, None, 0, None, 0, ctypes.byref(bytes_ret), None)
                 self.kernel32.DeviceIoControl(h, FSCTL_DISMOUNT_VOLUME, None, 0, None, 0, ctypes.byref(bytes_ret), None)
+                self._send_scsi_start_stop(h, start=False)
                 self.kernel32.CloseHandle(h)
                 return True
         except Exception:
             pass
         return False
 
-    def release_all_external_drives(self):
-        """Releases and dismounts all detected external/secondary drives."""
+    def release_all_external_drives(self, power_down=True):
+        """Releases, dismounts, and optionally powers down all detected external/secondary drives."""
         letters = set()
         active = self.get_active_disk()
         if active and active.get('letter'):
@@ -274,7 +422,7 @@ class DiskManager:
         letters.update(['E', 'F', 'G'])
 
         for l in letters:
-            self.safely_release_drive(l)
+            self.safely_release_drive(l, power_down=power_down)
 
 # Global instance
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

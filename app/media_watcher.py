@@ -12,6 +12,21 @@ def subproc_kwargs():
         kwargs['creationflags'] = subprocess.CREATE_NO_WINDOW
     return kwargs
 
+def _get_plex_token():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    prefs_path = os.path.join(project_root, "services", "plex", "config", "Library", "Application Support", "Plex Media Server", "Preferences.xml")
+    if os.path.exists(prefs_path):
+        try:
+            root = ET.parse(prefs_path).getroot()
+            return root.attrib.get("PlexOnlineToken", "")
+        except Exception:
+            pass
+    return ""
+
+def _plex_headers():
+    tok = _get_plex_token()
+    return {"X-Plex-Token": tok} if tok else {}
+
 class MediaWatcher(threading.Thread):
     def __init__(self, media_dir, poll_interval=3, quiet_seconds=6):
         super().__init__(daemon=True)
@@ -125,7 +140,7 @@ class MediaWatcher(threading.Thread):
         mapping = {}
         try:
             url = "http://localhost:32400/library/sections"
-            req = urllib.request.Request(url)
+            req = urllib.request.Request(url, headers=_plex_headers())
             with urllib.request.urlopen(req, timeout=2) as resp:
                 xml_data = resp.read()
                 root = ET.fromstring(xml_data)
@@ -152,7 +167,7 @@ class MediaWatcher(threading.Thread):
             url = "http://localhost:32400/library/sections/all/refresh"
             
         try:
-            req = urllib.request.Request(url)
+            req = urllib.request.Request(url, headers=_plex_headers())
             urllib.request.urlopen(req, timeout=3)
             print(f"[MediaWatcher] Triggered Plex section refresh for category '{category}' (section {sec_id})")
         except Exception as e:
@@ -167,7 +182,7 @@ class MediaWatcher(threading.Thread):
         else:
             url = "http://localhost:32400/library/sections/all/emptyTrash"
         try:
-            req = urllib.request.Request(url, method='PUT')
+            req = urllib.request.Request(url, headers=_plex_headers(), method='PUT')
             urllib.request.urlopen(req, timeout=3)
             print(f"[MediaWatcher] Triggered Plex section emptyTrash for category '{category}' (section {sec_id})")
         except Exception:
@@ -266,7 +281,7 @@ def trigger_plex_full_scan_on_startup():
             time.sleep(2)
             try:
                 url = "http://localhost:32400/library/sections/all/refresh"
-                req = urllib.request.Request(url)
+                req = urllib.request.Request(url, headers=_plex_headers())
                 with urllib.request.urlopen(req, timeout=3) as resp:
                     if resp.status == 200:
                         print("🚀 [Plex Startup] Triggered full library scan for all sections on Plex startup.")
