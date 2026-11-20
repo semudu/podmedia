@@ -42,6 +42,10 @@ def get_action_generator(action, target):
     elif action == 'music-sync':
         return podman_manager.organize_music()
 
+    elif action == 'restart-services':
+        import settings_manager
+        return settings_manager.restart_services_generator(target)
+
     elif action in ('toggle-group', 'start-group', 'stop-group'):
         group = target.lower()
         current_group_on = groups.get(group, False)
@@ -54,6 +58,7 @@ def get_action_generator(action, target):
         }
         app_container_map = {
             'plex': 'media_center_plex',
+            'plextraktsync': 'media_center_plextraktsync',
             'radarr': 'media_center_radarr',
             'sonarr': 'media_center_sonarr',
             'prowlarr': 'media_center_prowlarr',
@@ -100,6 +105,7 @@ def get_action_generator(action, target):
         app = target.lower()
         app_container_map = {
             'plex': 'media_center_plex',
+            'plextraktsync': 'media_center_plextraktsync',
             'radarr': 'media_center_radarr',
             'sonarr': 'media_center_sonarr',
             'prowlarr': 'media_center_prowlarr',
@@ -160,6 +166,32 @@ class AppHandler(BaseHTTPRequestHandler):
             except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
                 pass
 
+        elif path in ('/favicon.svg', '/favicon.ico', '/apple-touch-icon.png'):
+            base_dir = os.path.dirname(__file__)
+            asset_map = {
+                '/favicon.svg': ('favicon.svg', 'image/svg+xml'),
+                '/apple-touch-icon.png': ('apple-touch-icon.png', 'image/png'),
+                '/favicon.ico': ('favicon.ico', 'image/x-icon'),
+            }
+            fname, ctype = asset_map[path]
+            fpath = os.path.join(base_dir, fname)
+            if not os.path.exists(fpath):
+                fpath = os.path.join(base_dir, 'favicon.svg')
+                ctype = 'image/svg+xml'
+            if os.path.exists(fpath):
+                try:
+                    self.send_response(200)
+                    self.send_header('Content-Type', ctype)
+                    self.send_header('Cache-Control', 'public, max-age=86400')
+                    self.end_headers()
+                    with open(fpath, 'rb') as f:
+                        self.wfile.write(f.read())
+                except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+                    pass
+            else:
+                self.send_response(404)
+                self.end_headers()
+
         elif path == '/' or path == '/index.html':
             html_path = os.path.join(os.path.dirname(__file__), 'index.html')
             if os.path.exists(html_path):
@@ -193,7 +225,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 "groups": groups,
                 "is_busy": is_busy,
                 "external_disk": ext_disk,
-                "transfer": transfer_state
+                "transfer": transfer_state,
+                "trakt_configured": podman_manager.is_plextraktsync_configured()
             })
 
         elif path == '/api/transfer/status':
@@ -238,6 +271,90 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json(res)
             else:
                 self.send_json({"status": "error", "message": "Eksik parametre: drive"}, 400)
+
+        elif path == '/api/disks/sleep':
+            containers, _ = podman_manager.get_container_states()
+            if any(containers.values()):
+                self.send_json({
+                    "status": "error",
+                    "message": "Diski uyutmadan önce çalışan servisleri durdurun (Stop All)."
+                })
+                return
+            podman_manager.release_external_mounts(power_down=True)
+            self.send_json({
+                "status": "ok",
+                "message": "Harici disk güvenle uyku moduna (Offline / 0 RPM) alındı.",
+                "external_disk": podman_manager.get_external_disk_info()
+            })
+
+        elif path == '/api/disks/wake':
+            woken = disk_manager.wake_all_external_drives()
+            time.sleep(1.5)
+            ext_disk = podman_manager.get_external_disk_info()
+            self.send_json({
+                "status": "ok",
+                "woken": bool(woken),
+                "external_disk": ext_disk
+            })
+
+        elif path == '/api/trakt/sync':
+            if not podman_manager.is_plextraktsync_configured():
+                self.send_json({"status": "error", "message": "PlexTraktSync henüz kurulmamış."})
+                return
+            try:
+                import media_watcher
+                ok = media_watcher.sync_trakt_watchlist()
+                if media_watcher.watcher_instance and media_watcher.watcher_instance.watched_media_action != "keep":
+                    threading.Thread(
+                        target=media_watcher.cleanup_watched_media,
+                        args=(media_watcher.watcher_instance.watched_media_action,),
+                        daemon=True,
+                    ).start()
+                import radarr_sonarr_sync
+                radarr_sonarr_sync.trigger_radarr_command("ImportListSync")
+                radarr_sonarr_sync.trigger_sonarr_command("ImportListSync")
+                import hub_api
+                hub_api._trakt_cache["ts"] = 0
+                hub_api._summary_cache["ts"] = 0
+                self.send_json({"status": "ok" if ok else "busy", "synced": bool(ok)})
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 500)
+
+        elif path == '/api/hub/summary':
+            try:
+                import hub_api
+                query = urllib.parse.parse_qs(parsed.query)
+                force = query.get('force', ['0'])[0] == '1'
+                self.send_json(hub_api.get_hub_summary(force=force))
+            except Exception as e:
+                self.send_json({"error": str(e)}, 500)
+
+        elif path == '/api/hub/search':
+            try:
+                import hub_api
+                query = urllib.parse.parse_qs(parsed.query)
+                term = query.get('q', [''])[0]
+                mtype = query.get('type', ['all'])[0]
+                self.send_json(hub_api.search_media(term, mtype))
+            except Exception as e:
+                self.send_json({"error": str(e), "results": []}, 500)
+
+        elif path == '/api/hub/add':
+            try:
+                import hub_api
+                query = urllib.parse.parse_qs(parsed.query)
+                mtype = query.get('type', [''])[0]
+                item_id = query.get('id', [''])[0]
+                self.send_json(hub_api.add_media_item(mtype, item_id))
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 500)
+
+        elif path == '/api/settings':
+            try:
+                import settings_manager
+                self.send_json(settings_manager.get_settings())
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 500)
 
         elif path == '/api/updates/status':
             import auto_updater
@@ -425,6 +542,46 @@ class AppHandler(BaseHTTPRequestHandler):
 
         else:
             self.send_json({"status": "running", "info": "PodMedia Server"})
+
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        path = parsed.path
+        if path == '/api/settings':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                raw = self.rfile.read(length) if length > 0 else b'{}'
+                payload = json.loads(raw.decode('utf-8'))
+                import settings_manager
+                self.send_json(settings_manager.save_settings(payload))
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 400)
+        elif path == '/api/settings/reset':
+            try:
+                import settings_manager
+                self.send_json(settings_manager.reset_to_defaults())
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 500)
+        elif path == '/api/system/restart':
+            import settings_manager
+            new_port = settings_manager.get_settings().get("server_port", PORT)
+            self.send_json({"status": "restarting", "port": new_port})
+            def _async_restart_web():
+                time.sleep(0.3)
+                try:
+                    self.server.socket.close()
+                except Exception:
+                    pass
+                try:
+                    import subprocess
+                    app_script = os.path.abspath(__file__)
+                    kwargs = podman_manager.subproc_kwargs()
+                    subprocess.Popen([sys.executable, app_script], **kwargs)
+                except Exception as e:
+                    print("Self-restart error:", e)
+                os._exit(0)
+            threading.Thread(target=_async_restart_web, daemon=True).start()
+        else:
+            self.send_json({"status": "error", "message": "Not Found"}, 404)
 
     def log_message(self, format, *args):
         return

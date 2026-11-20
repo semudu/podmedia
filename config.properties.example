@@ -7,3 +7,8 @@ downloads_dir = ./downloads
 
 [podman]
 network = media_center_net
+
+[automation]
+watchlist_sync_minutes = 5
+auto_update_enabled = true
+watched_media_action = keep

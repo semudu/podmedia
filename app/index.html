@@ -1,24 +1,82 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="tr" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PodMedia Dashboard</title>
+    <title>PodMedia</title>
+    <meta name="theme-color" content="#4f46e5">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" type="image/png" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <link rel="shortcut icon" href="/favicon.ico">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --bg-primary: #0f172a;
-            --bg-card: #1e293b;
-            --bg-card-hover: #334155;
-            --text-main: #f8fafc;
+        /* =========================================================
+           DESIGN TOKENS — Soft Light (Default) & Calm Dark
+           ========================================================= */
+        :root,
+        [data-theme="light"] {
+            --bg-page: #f5f7fb;
+            --bg-surface: #ffffff;
+            --bg-subtle: #f8fafc;
+            --bg-hover: #f1f5f9;
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #64748b;
+            --border: #e5e9f2;
+            --border-strong: #cbd5e1;
+            --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.03);
+            --shadow-md: 0 10px 28px rgba(15, 23, 42, 0.07);
+            --accent: #4f46e5;
+            --accent-hover: #4338ca;
+            --accent-soft: rgba(79, 70, 229, 0.08);
+            --accent-border: rgba(79, 70, 229, 0.22);
+            --green: #059669;
+            --green-soft: rgba(5, 150, 105, 0.1);
+            --green-border: rgba(5, 150, 105, 0.28);
+            --red: #e11d48;
+            --red-soft: rgba(225, 29, 72, 0.08);
+            --red-border: rgba(225, 29, 72, 0.24);
+            --amber: #d97706;
+            --amber-soft: rgba(217, 119, 6, 0.1);
+            --amber-border: rgba(217, 119, 6, 0.28);
+            --switch-off: #cbd5e1;
+            --terminal-bg: #0f172a;
+            --terminal-text: #7dd3fc;
+            --modal-backdrop: rgba(15, 23, 42, 0.45);
+        }
+
+        [data-theme="dark"] {
+            --bg-page: #141720;
+            --bg-surface: #1c212e;
+            --bg-subtle: #171b26;
+            --bg-hover: #242a3a;
+            --text-primary: #eef2f7;
+            --text-secondary: #cbd5e1;
             --text-muted: #94a3b8;
-            --accent-blue: #38bdf8;
-            --accent-green: #22c55e;
-            --accent-red: #ef4444;
-            --accent-amber: #f59e0b;
-            --border: #334155;
+            --border: rgba(148, 163, 184, 0.14);
+            --border-strong: rgba(148, 163, 184, 0.26);
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+            --shadow-md: 0 12px 32px rgba(0, 0, 0, 0.42);
+            --accent: #818cf8;
+            --accent-hover: #6366f1;
+            --accent-soft: rgba(129, 140, 248, 0.13);
+            --accent-border: rgba(129, 140, 248, 0.3);
+            --green: #34d399;
+            --green-soft: rgba(52, 211, 153, 0.13);
+            --green-border: rgba(52, 211, 153, 0.32);
+            --red: #fb7185;
+            --red-soft: rgba(251, 113, 133, 0.12);
+            --red-border: rgba(251, 113, 133, 0.3);
+            --amber: #fbbf24;
+            --amber-soft: rgba(251, 191, 36, 0.13);
+            --amber-border: rgba(251, 191, 36, 0.3);
+            --switch-off: #334155;
+            --terminal-bg: #0c0f17;
+            --terminal-text: #7dd3fc;
+            --modal-backdrop: rgba(8, 10, 16, 0.72);
         }
 
         * {
@@ -29,438 +87,989 @@
         }
 
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-main);
-            padding: 20px;
-            max-width: 900px;
+            background-color: var(--bg-page);
+            color: var(--text-primary);
+            padding: 18px 20px 48px;
+            max-width: 1020px;
             margin: 0 auto;
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background-color 0.2s ease, color 0.2s ease;
+            -webkit-font-smoothing: antialiased;
         }
 
-        header {
+        /* =========================================================
+           APP HEADER SHELL
+           ========================================================= */
+        .app-header {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding-bottom: 20px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 24px;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 14px;
+            margin-bottom: 18px;
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow-sm);
         }
 
-        h1 {
-            font-size: 1.5rem;
+        .brand-group {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            min-width: 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .brand-logo {
+            width: 34px;
+            height: 34px;
+            border-radius: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .brand-logo img,
+        .brand-logo svg {
+            width: 34px;
+            height: 34px;
+            display: block;
+            border-radius: 9px;
+        }
+
+        .brand h1 {
+            font-size: 1.05rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            white-space: nowrap;
+        }
+
+        .nav-tabs {
+            display: inline-flex;
+            align-items: center;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 3px;
+            gap: 2px;
+        }
+
+        .nav-tab {
+            border: none;
+            background: transparent;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 6px 12px;
+            border-radius: 7px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.16s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .nav-tab:hover { color: var(--text-primary); }
+
+        .nav-tab.active {
+            background: var(--bg-surface);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .tab-badge {
+            font-size: 0.67rem;
+            font-weight: 700;
+            padding: 1px 6px;
+            border-radius: 999px;
+            background: var(--bg-hover);
+            color: var(--text-secondary);
+        }
+
+        .nav-tab.active .tab-badge {
+            background: var(--accent-soft);
+            color: var(--accent);
+        }
+
+        .tab-badge.live {
+            background: var(--green-soft);
+            color: var(--green);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .header-power {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .header-prefs {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding-left: 8px;
+            border-left: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        /* =========================================================
+           SHARED CONTROLS
+           ========================================================= */
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            padding: 7px 12px;
+            border-radius: 8px;
+            font-size: 0.78rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1px solid var(--border);
+            background: var(--bg-subtle);
+            color: var(--text-primary);
+            white-space: nowrap;
+            text-decoration: none;
+            transition: all 0.16s ease;
+        }
+
+        .btn:hover:not(:disabled):not(.disabled-link) {
+            background: var(--bg-hover);
+            border-color: var(--border-strong);
+        }
+
+        .btn:disabled,
+        .btn.disabled-link {
+            opacity: 0.4;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+
+        .btn-sm { padding: 5px 10px; font-size: 0.74rem; }
+
+        .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn-primary:hover:not(:disabled):not(.disabled-link) { background: var(--accent-hover); border-color: var(--accent-hover); color: #fff; }
+
+        .btn-start { background: var(--green-soft); color: var(--green); border-color: var(--green-border); }
+        .btn-start:hover:not(:disabled) { background: var(--green); color: #fff; border-color: var(--green); }
+
+        .btn-stop { background: var(--red-soft); color: var(--red); border-color: var(--red-border); }
+        .btn-stop:hover:not(:disabled) { background: var(--red); color: #fff; border-color: var(--red); }
+
+        .btn-busy { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-border); cursor: wait; }
+
+        .btn-quit { background: transparent; color: var(--red); border-color: var(--red-border); padding: 7px 10px; }
+        .btn-quit:hover:not(:disabled) { background: var(--red); color: #fff; border-color: var(--red); }
+
+        .btn-sleep { background: var(--amber-soft); color: var(--amber); border-color: var(--amber-border); }
+        .btn-sleep:hover:not(:disabled) { background: var(--amber); color: #fff; border-color: var(--amber); }
+
+        .btn-wake { background: var(--green-soft); color: var(--green); border-color: var(--green-border); }
+        .btn-wake:hover:not(:disabled) { background: var(--green); color: #fff; border-color: var(--green); }
+
+        .btn-icon-pref {
+            width: 34px;
+            height: 32px;
+            padding: 0;
+            border-radius: 8px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--bg-subtle);
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+            cursor: pointer;
+            transition: all 0.16s;
+            flex-shrink: 0;
+        }
+        .btn-icon-pref:hover { border-color: var(--accent-border); color: var(--accent); background: var(--accent-soft); }
+
+        .badge {
+            font-size: 0.7rem;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            white-space: nowrap;
+        }
+        .badge.on { background: var(--green-soft); color: var(--green); border: 1px solid var(--green-border); }
+        .badge.off { background: var(--bg-subtle); color: var(--text-muted); border: 1px solid var(--border); }
+        .badge.err { background: var(--red-soft); color: var(--red); border: 1px solid var(--red-border); }
+        .badge.busy { background: var(--amber-soft); color: var(--amber); border: 1px solid var(--amber-border); }
+        .badge.info { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent-border); }
+
+        .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; display: inline-block; }
+
+        .section-label {
+            font-size: 0.74rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+        }
+
+        /* =========================================================
+           VIEW SWITCHING
+           ========================================================= */
+        .view-panel { display: none; }
+        .view-panel.active { display: block; }
+
+        /* =========================================================
+           1. OVERVIEW (Unified Media Hub)
+           ========================================================= */
+        .grid-3 {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 20px;
+        }
+
+        .hub-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow-sm);
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .hub-card:hover { border-color: var(--border-strong); box-shadow: var(--shadow-md); }
+        .hub-card.is-active { border-color: var(--green-border); }
+
+        .hub-card-body {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            flex: 1;
+        }
+
+        .hub-card-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+        }
+
+        .icon-box {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .hub-card.is-active .icon-box {
+            background: var(--green-soft);
+            border-color: var(--green-border);
+        }
+
+        .hub-title { font-size: 0.98rem; font-weight: 700; letter-spacing: -0.015em; }
+        .hub-desc { font-size: 0.78rem; color: var(--text-muted); line-height: 1.45; min-height: 2.8em; }
+        .hub-meta-line {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding-top: 2px;
+        }
+        .hub-stat {
+            font-size: 0.74rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+        .hub-stat.live-dl {
+            color: var(--accent);
+        }
+
+        .hub-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 10px 14px;
+            background: var(--bg-subtle);
+            border-top: 1px solid var(--border);
+        }
+
+        /* =========================================================
+           COMPACT STORAGE SUMMARY CARD (Zero Duplication)
+           ========================================================= */
+        .storage-hero {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow-sm);
+            padding: 13px 16px;
+            margin-bottom: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 9px;
+            transition: border-color 0.2s;
+        }
+        .storage-hero.is-connected { border-color: var(--green-border); }
+
+        .storage-row-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .storage-id {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.92rem;
+            font-weight: 700;
+            flex-wrap: wrap;
+        }
+
+        .storage-cap-summary {
+            font-size: 0.76rem;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+        .storage-cap-summary b { color: var(--text-primary); }
+
+        .capacity-bar {
+            height: 6px;
+            background: var(--bg-hover);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .capacity-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, var(--accent), var(--green));
+            border-radius: 999px;
+            transition: width 0.4s ease;
+        }
+
+        .capacity-fill.warn {
+            background: linear-gradient(90deg, var(--amber), var(--red));
+        }
+
+        .storage-row-bottom {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .archive-text {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .archive-text b { color: var(--text-primary); }
+
+        .settings-group-title {
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            color: var(--text-muted);
+            margin-bottom: -4px;
+            padding-top: 4px;
+        }
+
+        .settings-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        /* Compact Ecosystem & Automation List */
+        .eco-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+        .eco-row:last-child { border-bottom: none; }
+
+        .eco-left {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            min-width: 0;
+            flex: 1 1 220px;
+        }
+
+        .eco-title {
+            font-size: 0.86rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .eco-sub {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .eco-sub b { color: var(--text-primary); font-weight: 600; }
+
+        .eco-actions {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            flex-wrap: wrap;
+        }
+
+        /* Admin Settings Form (Collapsible Expert Section) */
+        .settings-accordion {
+            overflow: hidden;
+        }
+
+        .settings-accordion > summary {
+            list-style: none;
+            cursor: pointer;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 13px 16px;
+            background: var(--bg-subtle);
+            transition: background-color 0.15s ease;
+        }
+        .settings-accordion > summary::-webkit-details-marker { display: none; }
+        .settings-accordion > summary:hover { background: var(--bg-hover); }
+        .settings-accordion[open] > summary { border-bottom: 1px solid var(--border); }
+
+        .settings-summary-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            min-width: 0;
+            flex-wrap: wrap;
+        }
+
+        .settings-summary-sub {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .settings-chevron {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            transition: transform 0.2s ease;
+            flex-shrink: 0;
+        }
+        .settings-accordion[open] .settings-chevron {
+            transform: rotate(180deg);
+            color: var(--accent);
+        }
+
+        .settings-body {
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px 16px;
+        }
+
+        .field {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+
+        .field label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+
+        .field input[type="text"],
+        .field input[type="number"],
+        .field select {
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 8px 11px;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .field input:focus,
+        .field select:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        .field-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 9px 12px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+        }
+
+        .field-toggle span {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .settings-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+            padding-top: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .settings-msg {
+            font-size: 0.78rem;
+            font-weight: 500;
+            color: var(--text-muted);
+        }
+
+        @media (max-width: 700px) {
+            .settings-grid { grid-template-columns: 1fr; }
+        }
+
+        .card-action-btn {
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--accent);
+            background: var(--accent-soft);
+            border: 1px solid var(--accent-border);
+            border-radius: 7px;
+            padding: 5px 10px;
+            text-decoration: none;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s;
+            white-space: nowrap;
+        }
+        .card-action-btn:hover:not(:disabled):not(.disabled-link) {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .card-action-btn:disabled,
+        .card-action-btn.disabled-link {
+            opacity: 0.36;
+            pointer-events: none;
+            cursor: default;
+        }
+
+        /* Live Active Downloads Card on Overview */
+        .panel-box {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            box-shadow: var(--shadow-sm);
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 16px;
+            background: var(--bg-subtle);
+            border-bottom: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .panel-title {
+            font-size: 0.86rem;
             font-weight: 700;
             display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dl-row {
+            padding: 11px 16px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .dl-row:last-child { border-bottom: none; }
+
+        .dl-top {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+        }
+
+        .dl-name {
+            font-size: 0.83rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
+
+        .dl-meta {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .mini-bar {
+            height: 5px;
+            background: var(--bg-hover);
+            border-radius: 999px;
+            overflow: hidden;
+        }
+
+        .mini-bar-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 999px;
+            transition: width 0.35s ease;
+        }
+        .mini-bar-fill.done { background: var(--green); }
+
+        /* Connected Integrations Cards */
+        .integration-meta {
+            font-size: 0.77rem;
+            color: var(--text-muted);
+            line-height: 1.4;
+        }
+        .integration-meta b { color: var(--text-primary); font-weight: 600; }
+
+        /* =========================================================
+           2. LIBRARY & DOWNLOADS VIEW (Unified Media Manager)
+           ========================================================= */
+        .search-hero {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            box-shadow: var(--shadow-sm);
+        }
+
+        .search-form {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1 1 240px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 9px 13px;
+            font-size: 0.86rem;
+            color: var(--text-primary);
+            outline: none;
+            transition: border-color 0.16s, box-shadow 0.16s;
+        }
+
+        .search-input:focus {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-soft);
+        }
+
+        .search-select {
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 9px;
+            padding: 9px 10px;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            outline: none;
+            cursor: pointer;
+        }
+
+        .search-results {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid var(--border);
+        }
+
+        .result-card {
+            display: flex;
+            gap: 12px;
+            padding: 10px;
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            align-items: flex-start;
+        }
+
+        .result-poster {
+            width: 48px;
+            height: 72px;
+            border-radius: 6px;
+            object-fit: cover;
+            background: var(--bg-hover);
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: var(--text-muted);
+        }
+
+        .result-info { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 4px; }
+        .result-title { font-size: 0.85rem; font-weight: 700; }
+        .result-overview { font-size: 0.72rem; color: var(--text-muted); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+        .filter-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .chip-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .chip {
+            border: 1px solid var(--border);
+            background: var(--bg-surface);
+            color: var(--text-secondary);
+            font-size: 0.74rem;
+            font-weight: 600;
+            padding: 5px 10px;
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .chip:hover { border-color: var(--border-strong); color: var(--text-primary); }
+        .chip.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+
+        .lib-filter-input {
+            background: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 5px 10px;
+            font-size: 0.78rem;
+            color: var(--text-primary);
+            outline: none;
+            width: 190px;
+        }
+        .lib-filter-input:focus { border-color: var(--accent); }
+
+        .lib-list {
+            max-height: 460px;
+            overflow-y: auto;
+        }
+
+        .lib-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 9px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+        .lib-row:last-child { border-bottom: none; }
+        .lib-row:hover { background: var(--bg-subtle); }
+
+        .lib-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+        .lib-thumb {
+            width: 30px;
+            height: 44px;
+            border-radius: 5px;
+            object-fit: cover;
+            background: var(--bg-hover);
+            flex-shrink: 0;
+        }
+        .lib-title { font-size: 0.85rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .lib-sub { font-size: 0.72rem; color: var(--text-muted); margin-top: 1px; }
+        .lib-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+        .empty-state {
+            padding: 28px 16px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.84rem;
+            display: flex;
+            flex-direction: column;
             align-items: center;
             gap: 10px;
         }
 
-        .header-actions {
+        .tools-strip {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 6px;
             flex-wrap: wrap;
         }
 
-        .active-badge {
-            background: rgba(30, 41, 59, 0.8);
-            border: 1px solid var(--border);
-            padding: 8px 14px;
-            border-radius: 20px;
-            font-size: 0.82rem;
-            font-weight: 600;
-            color: var(--text-muted);
+        /* =========================================================
+           3. ADMIN / SYSTEM VIEW
+           ========================================================= */
+        .service-row {
             display: flex;
             align-items: center;
-            gap: 8px;
-        }
-
-        .pulse-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: var(--accent-green);
-            box-shadow: 0 0 8px var(--accent-green);
-            transition: all 0.3s;
-        }
-
-        .btn-master {
-            padding: 10px 20px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.95rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            border: 1px solid transparent;
-        }
-
-        .btn-master.stop {
-            background: rgba(239, 68, 68, 0.15);
-            color: var(--accent-red);
-            border-color: var(--accent-red);
-        }
-
-        .btn-master.stop:hover {
-            background: var(--accent-red);
-            color: white;
-        }
-
-        .btn-master.start {
-            background: rgba(34, 197, 94, 0.15);
-            color: var(--accent-green);
-            border-color: var(--accent-green);
-        }
-
-        .btn-master.start:hover {
-            background: var(--accent-green);
-            color: white;
-        }
-
-        .btn-master.busy {
-            background: rgba(245, 158, 11, 0.15);
-            color: var(--accent-amber);
-            border-color: var(--accent-amber);
-            cursor: wait;
-        }
-
-        h2 {
-            font-size: 1rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin-bottom: 12px;
-            font-weight: 600;
-        }
-
-        .section {
-            margin-bottom: 32px;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-            gap: 16px;
-        }
-
-        .card {
-            background-color: var(--bg-card);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px;
-            display: flex;
             justify-content: space-between;
-            align-items: center;
-            transition: transform 0.15s, border-color 0.15s;
+            gap: 12px;
+            padding: 11px 16px;
+            border-bottom: 1px solid var(--border);
+            transition: background-color 0.14s;
         }
+        .service-row:last-child { border-bottom: none; }
+        .service-row:hover { background: var(--bg-subtle); }
 
-        .card:hover {
-            border-color: #475569;
-            transform: translateY(-2px);
-        }
+        .svc-left { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+        .svc-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border-strong); flex-shrink: 0; }
+        .svc-dot.on { background: var(--green); box-shadow: 0 0 0 3px var(--green-soft); }
+        .svc-dot.busy { background: var(--amber); }
+        .svc-name { font-size: 0.86rem; font-weight: 600; }
+        .svc-role { font-size: 0.73rem; color: var(--text-muted); margin-top: 1px; }
+        .svc-port { font-family: 'JetBrains Mono', monospace; font-size: 0.7rem; color: var(--text-muted); background: var(--bg-subtle); border: 1px solid var(--border); padding: 2px 6px; border-radius: 5px; }
+        .svc-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
-        .card-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
+        /* =========================================================
+           TOGGLE SWITCH
+           ========================================================= */
+        .switch { position: relative; display: inline-block; width: 42px; height: 24px; flex-shrink: 0; }
+        .switch.sm { width: 38px; height: 21px; }
+        .switch input { opacity: 0; width: 0; height: 0; }
+        .slider { position: absolute; cursor: pointer; inset: 0; background-color: var(--switch-off); transition: 0.2s ease; border-radius: 999px; }
+        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: #fff; transition: 0.2s ease; border-radius: 50%; box-shadow: 0 1px 3px rgba(0,0,0,0.25); }
+        .switch.sm .slider:before { height: 15px; width: 15px; }
+        input:checked + .slider { background-color: var(--green); }
+        input:checked + .slider:before { transform: translateX(18px); }
+        .switch.sm input:checked + .slider:before { transform: translateX(17px); }
+        input:disabled + .slider { opacity: 0.4; cursor: not-allowed; }
 
-        .card-title {
-            font-weight: 600;
-            font-size: 1.05rem;
-        }
-
-        .card-sub {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-top: 4px;
-        }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            display: inline-block;
-        }
-
-        .status-badge.off .status-dot { background-color: var(--accent-red); box-shadow: 0 0 8px rgba(239, 68, 68, 0.5); }
-        .status-badge.off { color: var(--accent-red); }
-
-        .status-badge.on .status-dot { background-color: var(--accent-green); box-shadow: 0 0 8px rgba(34, 197, 94, 0.5); }
-        .status-badge.on { color: var(--accent-green); }
-
-        .status-badge.busy .status-dot { background-color: var(--accent-amber); box-shadow: 0 0 8px rgba(245, 158, 11, 0.5); }
-        .status-badge.busy { color: var(--accent-amber); }
-
-        .link-btn {
-            font-size: 0.75rem;
-            color: var(--accent-blue);
-            text-decoration: none;
-            margin-top: 4px;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            width: fit-content;
-        }
-
-        .link-btn:hover {
-            text-decoration: underline;
-        }
-
-        .btn-sync {
-            font-size: 0.75rem;
-            color: var(--accent-amber);
-            background: rgba(245, 158, 11, 0.1);
-            border: 1px solid var(--accent-amber);
-            border-radius: 6px;
-            padding: 3px 8px;
-            margin-top: 6px;
-            cursor: pointer;
-            width: fit-content;
-            transition: all 0.2s;
-        }
-
-        .btn-sync:hover {
-            background: var(--accent-amber);
-            color: #000;
-            font-weight: 600;
-        }
-
-        /* TOGGLE SWITCH */
-        .switch {
-            position: relative;
-            display: inline-block;
-            width: 48px;
-            height: 26px;
-            flex-shrink: 0;
-        }
-
-        .switch input {
-            opacity: 0;
-            width: 0;
-            height: 0;
-        }
-
-        .slider {
-            position: absolute;
-            cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #334155;
-            transition: .3s;
-            border-radius: 34px;
-        }
-
-        .slider:before {
-            position: absolute;
-            content: "";
-            height: 18px;
-            width: 18px;
-            left: 4px;
-            bottom: 4px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
-        }
-
-        input:checked + .slider {
-            background-color: var(--accent-green);
-        }
-
-        input:checked + .slider:before {
-            transform: translateX(22px);
-        }
-
-        input:disabled + .slider {
-            opacity: 0.4;
-            cursor: not-allowed;
-        }
-
-        /* MODAL & TERMINAL LOGS */
+        /* =========================================================
+           MODALS & FLOATING TRANSFER BAR
+           ========================================================= */
         .modal-overlay {
             position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(15, 23, 42, 0.85);
+            inset: 0;
+            background: var(--modal-backdrop);
             backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
             display: none;
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            padding: 20px;
+            padding: 16px;
         }
 
         .modal {
-            background: var(--bg-card);
+            background: var(--bg-surface);
             border: 1px solid var(--border);
-            border-radius: 12px;
+            border-radius: 14px;
             width: 100%;
-            max-width: 650px;
-            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);
-            overflow: hidden;
+            max-width: 620px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: var(--shadow-md);
             display: flex;
             flex-direction: column;
         }
 
         .modal-header {
-            padding: 16px;
+            padding: 14px 18px;
             border-bottom: 1px solid var(--border);
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: #111827;
+            background: var(--bg-subtle);
         }
 
-        .modal-title {
-            font-weight: 600;
-            font-size: 0.95rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
+        .modal-title { font-weight: 600; font-size: 0.94rem; display: flex; align-items: center; gap: 8px; }
+        .btn-close-modal { background: transparent; border: none; color: var(--text-muted); font-size: 1.1rem; cursor: pointer; padding: 4px 8px; border-radius: 6px; }
+        .btn-close-modal:hover { color: var(--text-primary); background: var(--bg-hover); }
 
-        .progress-bar-bg {
-            height: 4px;
-            background: #334155;
-            width: 100%;
-            overflow: hidden;
-        }
-
-        .progress-bar-fill {
-            height: 100%;
-            background: var(--accent-blue);
-            width: 0%;
-            transition: width 0.3s ease;
-        }
+        .progress-bar-bg { height: 5px; background: var(--border); width: 100%; overflow: hidden; }
+        .progress-bar-fill { height: 100%; background: var(--accent); width: 0%; transition: width 0.3s ease; }
 
         .terminal {
-            background: #090d16;
-            color: #38bdf8;
+            background: var(--terminal-bg);
+            color: var(--terminal-text);
             font-family: 'JetBrains Mono', monospace;
-            font-size: 0.85rem;
-            padding: 16px;
-            height: 260px;
+            font-size: 0.8rem;
+            padding: 14px 16px;
+            height: 250px;
             overflow-y: auto;
             white-space: pre-wrap;
             line-height: 1.5;
-        }
-        /* STORAGE BANNER */
-        .storage-banner {
-            background: #1e293b;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 16px 20px;
-            margin-bottom: 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            gap: 16px;
-        }
-
-        .storage-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .storage-icon {
-            font-size: 2rem;
-            background: #0f172a;
-            padding: 10px;
-            border-radius: 10px;
-            border: 1px solid var(--border);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .storage-title {
-            font-size: 1.05rem;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .disk-badge {
-            font-size: 0.75rem;
-            padding: 3px 8px;
-            border-radius: 12px;
-            font-weight: 500;
-        }
-
-        .disk-badge.connected {
-            background: rgba(34, 197, 94, 0.15);
-            color: var(--accent-green);
-            border: 1px solid rgba(34, 197, 94, 0.3);
-        }
-
-        .disk-badge.disconnected {
-            background: rgba(239, 68, 68, 0.15);
-            color: var(--accent-red);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-        }
-
-        .storage-meta {
-            font-size: 0.85rem;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-
-        .btn-transfer {
-            background: linear-gradient(135deg, #0284c7, #0369a1);
-            color: white;
-            border: none;
-            padding: 10px 18px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            border-radius: 8px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-
-        .btn-transfer:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.35);
-        }
-
-        .btn-transfer:disabled {
-            background: #334155;
-            color: #64748b;
-            cursor: not-allowed;
-            transform: none;
-            box-shadow: none;
-        }
-
-        .btn-disk-select {
-            background: #0f172a;
-            color: #94a3b8;
-            border: 1px solid var(--border);
-            padding: 9px 14px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            border-radius: 8px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            transition: all 0.2s;
-        }
-
-        .btn-disk-select:hover {
-            color: #f1f5f9;
-            background: #1e293b;
-            border-color: #475569;
         }
 
         .disk-item {
@@ -468,541 +1077,675 @@
             justify-content: space-between;
             align-items: center;
             padding: 12px 14px;
-            background: #0b1120;
+            background: var(--bg-subtle);
             border: 1px solid var(--border);
-            border-radius: 8px;
-            transition: all 0.2s;
+            border-radius: 10px;
+            gap: 10px;
         }
+        .disk-item.active { border-color: var(--green-border); background: var(--green-soft); }
+        .disk-item-info { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .disk-item-icon { font-size: 1.35rem; }
+        .disk-item-name { font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .disk-item-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
 
-        .disk-item.active {
-            border-color: var(--accent-green);
-            background: rgba(34, 197, 94, 0.05);
-        }
+        .btn-select-action { background: var(--accent); color: #fff; border: none; padding: 7px 14px; font-size: 0.8rem; font-weight: 600; border-radius: 7px; cursor: pointer; white-space: nowrap; }
+        .btn-select-action:hover { background: var(--accent-hover); }
+        .btn-select-action.selected { background: var(--green-soft); color: var(--green); border: 1px solid var(--green-border); cursor: default; }
 
-        .disk-item-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .disk-item-icon {
-            font-size: 1.5rem;
-        }
-
-        .disk-item-name {
-            font-weight: 600;
-            font-size: 0.92rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .disk-item-sub {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .btn-select-action {
-            background: #0284c7;
-            color: white;
-            border: none;
-            padding: 7px 12px;
-            font-size: 0.82rem;
-            font-weight: 600;
-            border-radius: 6px;
-            cursor: pointer;
-            transition: background 0.2s;
-        }
-
-        .btn-select-action:hover {
-            background: #0369a1;
-        }
-
-        .btn-select-action.selected {
-            background: rgba(34, 197, 94, 0.15);
-            color: var(--accent-green);
-            border: 1px solid var(--accent-green);
-            cursor: default;
-        }
-
-        /* FLOATING TRANSFER MINI BAR (Non-blocking) */
         .transfer-floating {
             position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: #0f172a;
-            border: 1px solid #38bdf8;
+            bottom: 20px;
+            right: 20px;
+            background: var(--bg-surface);
+            border: 1px solid var(--accent-border);
             border-radius: 12px;
-            padding: 12px 18px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+            padding: 11px 16px;
+            box-shadow: var(--shadow-md);
             display: flex;
             align-items: center;
-            gap: 16px;
+            gap: 12px;
             z-index: 999;
             cursor: pointer;
-            transition: transform 0.2s, box-shadow 0.2s;
-            animation: slideUp 0.3s ease;
+            animation: slideUp 0.25s ease;
+        }
+        @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .floating-content { display: flex; align-items: center; gap: 10px; min-width: 0; flex: 1; }
+        .floating-content > div:last-child { min-width: 0; overflow: hidden; }
+        .floating-spinner { width: 16px; height: 16px; border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .floating-title { font-size: 0.84rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .floating-meta { font-size: 0.74rem; color: var(--text-muted); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .transfer-body { padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+        .transfer-section { display: flex; flex-direction: column; gap: 6px; }
+        .t-row { display: flex; justify-content: space-between; align-items: center; font-size: 0.84rem; gap: 8px; }
+        .t-label { color: var(--text-muted); }
+        .t-val { font-weight: 600; }
+        .file-fill { background: var(--green) !important; }
+        .t-metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+        .t-metric-card { background: var(--bg-subtle); border: 1px solid var(--border); padding: 10px; border-radius: 8px; text-align: center; }
+        .t-metric-lbl { font-size: 0.68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+        .t-metric-val { font-size: 0.96rem; font-weight: 700; color: var(--accent); margin-top: 4px; }
+        .t-status-msg { background: var(--terminal-bg); color: #94a3b8; padding: 10px 12px; border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.78rem; white-space: pre-wrap; max-height: 70px; overflow-y: auto; }
+        .t-actions { display: flex; gap: 10px; }
+        .btn-t-graceful, .btn-t-immediate { flex: 1; border: none; padding: 10px 12px; border-radius: 8px; font-weight: 600; font-size: 0.84rem; cursor: pointer; }
+        .btn-t-graceful { background: var(--amber); color: #fff; }
+        .btn-t-immediate { background: var(--red); color: #fff; }
+        .btn-t-graceful:disabled, .btn-t-immediate:disabled { opacity: 0.45; cursor: not-allowed; }
+
+        /* =========================================================
+           RESPONSIVE
+           ========================================================= */
+        @media (max-width: 880px) {
+            body { padding: 12px 12px 34px; }
+            .app-header { flex-wrap: wrap; gap: 10px; padding: 12px 14px; }
+            .brand-group { width: 100%; justify-content: space-between; }
+            .header-right { width: 100%; justify-content: space-between; padding-top: 10px; border-top: 1px solid var(--border); }
+            .header-prefs { border-left: none; padding-left: 0; }
+            .grid-3 { grid-template-columns: 1fr; gap: 12px; }
+            .hub-desc { min-height: auto; }
+            .search-results { grid-template-columns: 1fr; }
+            .transfer-floating { left: 12px; right: 12px; bottom: 12px; }
         }
 
-        .transfer-floating:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 12px 30px rgba(56, 189, 248, 0.25);
-        }
-
-        @keyframes slideUp {
-            from { transform: translateY(20px); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-
-        .floating-content {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .floating-spinner {
-            width: 18px;
-            height: 18px;
-            border: 2px solid #38bdf8;
-            border-top-color: transparent;
-            border-radius: 50%;
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .floating-title {
-            font-size: 0.9rem;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-
-        .floating-meta {
-            font-size: 0.78rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .btn-float-details {
-            background: #1e293b;
-            color: #38bdf8;
-            border: 1px solid #334155;
-            padding: 6px 12px;
-            border-radius: 6px;
-            font-size: 0.8rem;
-            font-weight: 600;
-            cursor: pointer;
-        }
-
-        /* TRANSFER MODAL SPECIFIC */
-        .transfer-modal {
-            max-width: 680px;
-            padding: 0;
-        }
-
-        .btn-close-modal {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 1.2rem;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-
-        .btn-close-modal:hover {
-            color: #f1f5f9;
-            background: #1e293b;
-        }
-
-        .transfer-body {
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .transfer-section {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        .t-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.88rem;
-        }
-
-        .t-label {
-            color: var(--text-muted);
-        }
-
-        .t-val {
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-
-        .file-fill {
-            background: #10b981 !important;
-        }
-
-        .t-metrics-grid {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-            margin-top: 4px;
-        }
-
-        .t-metric-card {
-            background: #0f172a;
-            border: 1px solid var(--border);
-            padding: 10px 12px;
-            border-radius: 8px;
-            text-align: center;
-        }
-
-        .t-metric-lbl {
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        .t-metric-val {
-            font-size: 1rem;
-            font-weight: 700;
-            color: #38bdf8;
-            margin-top: 4px;
-        }
-
-        .t-status-msg {
-            background: #090d16;
-            border: 1px solid var(--border);
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.82rem;
-            color: #94a3b8;
-            white-space: pre-wrap;
-            max-height: 70px;
-            overflow-y: auto;
-        }
-
-        .t-actions {
-            display: flex;
-            gap: 12px;
-            margin-top: 6px;
-        }
-
-        .btn-t-graceful {
-            flex: 1;
-            background: #f59e0b;
-            color: #0f172a;
-            border: none;
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.88rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-t-graceful:hover {
-            background: #d97706;
-        }
-
-        .btn-t-immediate {
-            flex: 1;
-            background: #ef4444;
-            color: white;
-            border: none;
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 0.88rem;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .btn-t-immediate:hover {
-            background: #dc2626;
-        }
-
-        .btn-t-graceful:disabled, .btn-t-immediate:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
+        @media (max-width: 540px) {
+            body { padding: 10px 10px 28px; }
+            .brand-group { flex-wrap: wrap; gap: 8px; }
+            .nav-tabs { width: 100%; }
+            .nav-tab { flex: 1; justify-content: center; padding: 6px 6px; font-size: 0.75rem; }
+            .header-power { flex: 1; flex-wrap: wrap; }
+            .header-power > .btn { flex: 1 1 auto; }
+            .lib-filter-input { width: 100%; }
+            .svc-port { display: none; }
+            .service-row { flex-wrap: wrap; gap: 8px; }
+            .svc-right { margin-left: auto; }
+            .modal-overlay { padding: 10px; }
+            .transfer-body { padding: 14px; gap: 12px; }
+            .t-row { flex-wrap: wrap; font-size: 0.8rem; }
+            .t-metrics-grid { grid-template-columns: repeat(2, 1fr); }
+            .t-metrics-grid .t-metric-card:last-child { grid-column: span 2; }
+            .t-actions { flex-direction: column; gap: 8px; }
+            .disk-item { flex-direction: column; align-items: stretch; }
+            .btn-select-action { width: 100%; text-align: center; padding: 9px 12px; }
+            .terminal { height: 200px; font-size: 0.74rem; }
         }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>🍿 PodMedia Hub</h1>
-        <div class="header-actions">
-            <div class="active-badge" id="update-badge" title="Açık konteynerler için otomatik güncelleme devrede (tıklayarak hemen kontrol edebilirsiniz)" style="cursor: pointer; background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8;" onclick="checkUpdatesNow()">
-                🔄 Auto-Update: Aktif
+    <!-- UNIFIED APP NAVIGATION SHELL -->
+    <header class="app-header">
+        <div class="brand-group">
+            <div class="brand">
+                <div class="brand-logo"><img src="/favicon.svg" alt="PodMedia"></div>
+                <h1>PodMedia</h1>
             </div>
-            <div class="active-badge" id="active-summary">
-                <span class="pulse-dot" id="pulse-dot"></span>
-                <span id="active-count">0 / 8 Active</span>
+            <nav class="nav-tabs" role="tablist">
+                <button class="nav-tab active" id="tab-overview" onclick="switchView('overview')" data-i18n="tabOverview">Ana Sayfa</button>
+                <button class="nav-tab" id="tab-library" onclick="switchView('library')">
+                    <span data-i18n="tabLibrary">Kütüphane</span>
+                    <span class="tab-badge" id="tab-dl-badge" style="display: none;">0</span>
+                </button>
+                <button class="nav-tab" id="tab-admin" onclick="switchView('admin')">
+                    <span data-i18n="tabAdmin">Yönetim</span>
+                    <span class="tab-badge" id="tab-services-count">0/10</span>
+                </button>
+            </nav>
+        </div>
+
+        <div class="header-right">
+            <div class="header-power">
+                <button id="start-all-btn" class="btn btn-start" onclick="triggerAction('start-all', '')">▶️ Başlat</button>
+                <button id="stop-all-btn" class="btn btn-stop" onclick="triggerAction('stop-all', '')">🛑 Durdur</button>
+                <button id="quit-podmedia-btn" class="btn btn-quit" onclick="quitPodMedia()">⏻ Kapat</button>
             </div>
-            <button id="start-all-btn" class="btn-master start" onclick="triggerAction('start-all', '')">
-                ▶️ Start All
-            </button>
-            <button id="stop-all-btn" class="btn-master stop" onclick="triggerAction('stop-all', '')">
-                🛑 Stop All
-            </button>
-            <button id="quit-podmedia-btn" class="btn-master" style="background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #fca5a5; padding: 8px 14px; font-weight: 600; cursor: pointer; transition: all 0.2s;" onclick="quitPodMedia()" title="PodMedia'yı, tüm konteynerleri durdurur ve harici diski güvenle serbest bırakır">
-                ⏻ Kapat
-            </button>
+            <div class="header-prefs">
+                <button id="theme-toggle-btn" class="btn-icon-pref" onclick="toggleTheme()" title="Tema / Theme">🌙</button>
+                <button id="lang-toggle-btn" class="btn-icon-pref" onclick="toggleLanguage()" title="Dil / Language">TR</button>
+            </div>
         </div>
     </header>
 
-    <!-- EXTERNAL STORAGE & HYBRID ARCHIVE BANNER -->
-    <div class="storage-banner" id="storage-banner">
-        <div class="storage-info">
-            <div class="storage-icon">💾</div>
-            <div>
-                <div class="storage-title">
-                    <span id="disk-status-title">Harici Disk (E:)</span>
-                    <span class="disk-badge" id="disk-badge">Kontrol ediliyor...</span>
+    <!-- =========================================================
+         VIEW 1: ANA SAYFA (Zero Duplication, Zero Layout Shift)
+         ========================================================= -->
+    <main class="view-panel active" id="view-overview">
+
+        <!-- 1. THREE CORE MEDIA MODES -->
+        <div class="grid-3">
+            <!-- Cinema & Watch -->
+            <div class="hub-card" id="mode-card-plex">
+                <div class="hub-card-body">
+                    <div class="hub-card-top">
+                        <div class="icon-box">🎬</div>
+                        <label class="switch">
+                            <input type="checkbox" id="group-plex-toggle" onchange="triggerAction('toggle-group', 'plex')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div>
+                        <div class="hub-title" data-i18n="modeStream">Sinema & İzleme</div>
+                        <div class="hub-desc" data-i18n="modeStreamDesc">Film ve dizilerini TV, telefon veya tarayıcıdan izle.</div>
+                    </div>
+                    <div class="hub-meta-line">
+                        <span class="badge off" id="group-plex-badge"><span class="status-dot"></span><span id="group-plex-text">...</span></span>
+                        <span class="hub-stat" id="overview-plex-stat"></span>
+                    </div>
                 </div>
-                <div class="storage-meta" id="storage-meta">
-                    Depolama durumu taranıyor...
+                <div class="hub-card-footer">
+                    <a href="#" data-port="32400" data-path="/web" data-protocol="http" target="_blank" class="card-action-btn disabled-link" id="quick-plex-link" data-i18n="openPlayer">Oynatıcıyı Aç ↗</a>
+                    <a href="https://app.plex.tv/desktop/#!/watchlist" target="_blank" class="btn btn-sm">Watchlist ↗</a>
+                </div>
+            </div>
+
+            <!-- Library & Auto Downloads -->
+            <div class="hub-card" id="mode-card-downloads">
+                <div class="hub-card-body">
+                    <div class="hub-card-top">
+                        <div class="icon-box">📥</div>
+                        <label class="switch">
+                            <input type="checkbox" id="group-downloads-toggle" onchange="triggerAction('toggle-group', 'downloads')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div>
+                        <div class="hub-title" data-i18n="modeDownload">Kütüphane & İndirme</div>
+                        <div class="hub-desc" data-i18n="modeDownloadDesc">İzleme listendeki film ve dizileri otomatik bulup indirir.</div>
+                    </div>
+                    <div class="hub-meta-line">
+                        <span class="badge off" id="group-downloads-badge"><span class="status-dot"></span><span id="group-downloads-text">...</span></span>
+                        <span class="hub-stat" id="overview-lib-stat"></span>
+                    </div>
+                </div>
+                <div class="hub-card-footer">
+                    <button class="card-action-btn" onclick="switchView('library')" data-i18n="openLibrary">Kütüphaneyi Aç →</button>
+                    <span class="hub-stat live-dl" id="overview-dl-pill"></span>
+                </div>
+            </div>
+
+            <!-- Music Library -->
+            <div class="hub-card" id="mode-card-music">
+                <div class="hub-card-body">
+                    <div class="hub-card-top">
+                        <div class="icon-box">🎵</div>
+                        <label class="switch">
+                            <input type="checkbox" id="group-music-toggle" onchange="triggerAction('toggle-group', 'music')">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div>
+                        <div class="hub-title" data-i18n="modeMusic">Müzik Arşivi</div>
+                        <div class="hub-desc" data-i18n="modeMusicDesc">Yüksek kaliteli müzik indir ve kütüphaneni otomatik etiketle.</div>
+                    </div>
+                    <div class="hub-meta-line">
+                        <span class="badge off" id="group-music-badge"><span class="status-dot"></span><span id="group-music-text">...</span></span>
+                        <span class="hub-stat" id="overview-music-stat"></span>
+                    </div>
+                </div>
+                <div class="hub-card-footer">
+                    <button class="card-action-btn" id="quick-music-tag-btn" onclick="triggerAction('music-sync', '')" disabled data-i18n="organizeMusic">Arşivi Düzenle ⚡</button>
+                    <a href="#" data-port="8081" target="_blank" class="btn btn-sm disabled-link" id="quick-metube-link">YouTube ↗</a>
                 </div>
             </div>
         </div>
-        <div class="storage-actions" style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-            <button id="disk-select-btn" class="btn-disk-select" onclick="openDiskSelectModal()" title="Bağlı diskleri görüntüle veya hedef diski seç">
-                ⚙️ Disk Seç / Değiştir
-            </button>
-            <button id="transfer-btn" class="btn-transfer" onclick="startTransfer()" disabled>
-                📦 Harici Diske Aktar ve Yer Aç
-            </button>
+
+        <!-- 2. COMPACT EXTERNAL STORAGE SUMMARY (Zero Duplication) -->
+        <div class="storage-hero" id="storage-hero">
+            <div class="storage-row-top">
+                <div class="storage-id">
+                    <span>💾</span>
+                    <span id="disk-status-title">Harici Arşiv Diski</span>
+                    <span class="badge off" id="disk-badge">...</span>
+                </div>
+                <div class="storage-cap-summary" id="disk-cap-summary"></div>
+            </div>
+            <div class="capacity-bar" id="disk-capacity-wrap" style="display: none;">
+                <div class="capacity-fill" id="disk-capacity-fill"></div>
+            </div>
+            <div class="storage-row-bottom">
+                <div class="archive-text" id="storage-meta">...</div>
+                <button class="btn btn-sm btn-primary" id="transfer-btn" onclick="handleOverviewTransferClick()" style="display: none;" data-i18n="moveToDisk">📦 Diske Aktar</button>
+            </div>
         </div>
-    </div>
 
-    <!-- PRESET GROUPS -->
-    <div class="section">
-        <h2>Modes & Profiles</h2>
-        <div class="grid">
-            
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">🎬 Stream Mode</div>
-                    <div class="card-sub">Plex Media Server</div>
-                    <div class="status-badge" id="group-plex-badge"><span class="status-dot"></span><span id="group-plex-text">...</span></div>
+        <!-- 3. CONNECTED ECOSYSTEM STRIP (Trakt.tv) -->
+        <div class="panel-box">
+            <div class="eco-row">
+                <div class="eco-left">
+                    <div class="icon-box" style="width: 34px; height: 34px; font-size: 1rem;">🎞️</div>
+                    <div style="min-width: 0;">
+                        <div class="eco-title">
+                            <span>Trakt.tv</span>
+                            <span class="badge off" id="int-trakt-badge">...</span>
+                        </div>
+                        <div class="eco-sub" id="int-trakt-meta">...</div>
+                    </div>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="group-plex-toggle" onchange="triggerAction('toggle-group', 'plex')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">📥 Download Mode</div>
-                    <div class="card-sub">Radarr, Sonarr, qBit, Prowlarr</div>
-                    <div class="status-badge" id="group-downloads-badge"><span class="status-dot"></span><span id="group-downloads-text">...</span></div>
+                <div class="eco-actions">
+                    <button class="btn btn-sm" id="int-trakt-sync-btn" onclick="syncTraktWatchlistNow()" data-i18n="syncWatchlist">🔄 Watchlist Eşitle</button>
+                    <a href="https://trakt.tv/users/me/watchlist" target="_blank" class="btn btn-sm">Trakt ↗</a>
                 </div>
-                <label class="switch">
-                    <input type="checkbox" id="group-downloads-toggle" onchange="triggerAction('toggle-group', 'downloads')">
-                    <span class="slider"></span>
-                </label>
             </div>
-
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">🎵 Music Mode</div>
-                    <div class="card-sub">Plex, Slskd, Beets</div>
-                    <div class="status-badge" id="group-music-badge"><span class="status-dot"></span><span id="group-music-text">...</span></div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="group-music-toggle" onchange="triggerAction('toggle-group', 'music')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
         </div>
-    </div>
+    </main>
 
-    <!-- INDIVIDUAL APPLICATIONS -->
-    <div class="section">
-        <h2>Applications & Services</h2>
-        <div class="grid">
+    <!-- =========================================================
+         VIEW 2: KÜTÜPHANE & İNDİRMELER (Unified Search + Queue + Library)
+         ========================================================= -->
+    <section class="view-panel" id="view-library">
 
-            <!-- Plex -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">Plex Server</div>
-                    <div class="status-badge" id="app-plex-badge"><span class="status-dot"></span><span id="app-plex-text">...</span></div>
-                    <a href="#" data-port="32400" data-path="/web" data-protocol="https" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-plex-toggle" onchange="triggerAction('toggle-app', 'plex')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Radarr -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">Radarr (Movies)</div>
-                    <div class="status-badge" id="app-radarr-badge"><span class="status-dot"></span><span id="app-radarr-text">...</span></div>
-                    <a href="#" data-port="7878" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-radarr-toggle" onchange="triggerAction('toggle-app', 'radarr')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Sonarr -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">Sonarr (TV Shows)</div>
-                    <div class="status-badge" id="app-sonarr-badge"><span class="status-dot"></span><span id="app-sonarr-text">...</span></div>
-                    <a href="#" data-port="8989" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-sonarr-toggle" onchange="triggerAction('toggle-app', 'sonarr')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- qBittorrent -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">qBittorrent</div>
-                    <div class="status-badge" id="app-qbittorrent-badge"><span class="status-dot"></span><span id="app-qbittorrent-text">...</span></div>
-                    <a href="#" data-port="8080" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-qbittorrent-toggle" onchange="triggerAction('toggle-app', 'qbittorrent')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Prowlarr -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">Prowlarr</div>
-                    <div class="status-badge" id="app-prowlarr-badge"><span class="status-dot"></span><span id="app-prowlarr-text">...</span></div>
-                    <a href="#" data-port="9696" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-prowlarr-toggle" onchange="triggerAction('toggle-app', 'prowlarr')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- FlareSolverr -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">FlareSolverr</div>
-                    <div class="status-badge" id="app-flaresolverr-badge"><span class="status-dot"></span><span id="app-flaresolverr-text">...</span></div>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-flaresolverr-toggle" onchange="triggerAction('toggle-app', 'flaresolverr')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Slskd -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">Slskd (FLAC)</div>
-                    <div class="status-badge" id="app-slskd-badge"><span class="status-dot"></span><span id="app-slskd-text">...</span></div>
-                    <a href="#" data-port="5030" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-slskd-toggle" onchange="triggerAction('toggle-app', 'slskd')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- MeTube (YouTube / YouTube Music) -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">MeTube (YouTube Music)</div>
-                    <div class="status-badge" id="app-metube-badge"><span class="status-dot"></span><span id="app-metube-text">...</span></div>
-                    <a href="#" data-port="8081" target="_blank" class="link-btn">Open Web UI ↗</a>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-metube-toggle" onchange="triggerAction('toggle-app', 'metube')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
-            <!-- Beets -->
-            <div class="card">
-                <div class="card-info">
-                    <div class="card-title">Beets (Auto-Tagging)</div>
-                    <div class="status-badge" id="app-beets-badge"><span class="status-dot"></span><span id="app-beets-text">...</span></div>
-                    <button class="btn-sync" onclick="triggerAction('music-sync', '')">⚡ Start Auto-Tagging</button>
-                </div>
-                <label class="switch">
-                    <input type="checkbox" id="app-beets-toggle" onchange="triggerAction('toggle-app', 'beets')">
-                    <span class="slider"></span>
-                </label>
-            </div>
-
+        <!-- Unified Add & Search Bar -->
+        <div class="search-hero">
+            <form class="search-form" onsubmit="event.preventDefault(); searchNewMedia();">
+                <input type="text" id="media-search-input" class="search-input" placeholder="Film veya dizi ara ve tek tıkla kütüphaneye ekle...">
+                <select id="media-search-type" class="search-select">
+                    <option value="all" data-i18n="optAll">Film & Dizi</option>
+                    <option value="movie" data-i18n="optMovies">Sadece Film</option>
+                    <option value="show" data-i18n="optShows">Sadece Dizi</option>
+                </select>
+                <button type="submit" class="btn btn-primary" id="media-search-btn" data-i18n="searchAddBtn">🔍 Ara</button>
+            </form>
+            <div id="search-results-area" style="display: none;"></div>
         </div>
-    </div>
 
-    <!-- REAL-TIME CONSOLE & PROGRESS MODAL -->
+        <!-- Download Queue Panel -->
+        <div class="panel-box">
+            <div class="panel-header">
+                <div class="panel-title">⬇️ <span data-i18n="queueTitle">İndirme Kuyruğu</span> <span class="badge off" id="lib-dl-badge">0</span></div>
+                <div class="tools-strip">
+                    <a href="#" data-port="8080" target="_blank" class="btn btn-sm disabled-link" id="lib-link-qbit">qBittorrent ↗</a>
+                    <a href="#" data-port="7878" target="_blank" class="btn btn-sm disabled-link" id="lib-link-radarr">Radarr ↗</a>
+                    <a href="#" data-port="8989" target="_blank" class="btn btn-sm disabled-link" id="lib-link-sonarr">Sonarr ↗</a>
+                    <a href="#" data-port="5030" target="_blank" class="btn btn-sm disabled-link" id="lib-link-slskd">Slskd ↗</a>
+                    <a href="#" data-port="8081" target="_blank" class="btn btn-sm disabled-link" id="lib-link-metube">MeTube ↗</a>
+                </div>
+            </div>
+            <div id="lib-dl-list">
+                <div class="empty-state" data-i18n="loadingText">Yükleniyor...</div>
+            </div>
+        </div>
+
+        <!-- Unified Library List (Movies + Shows) -->
+        <div class="panel-box">
+            <div class="panel-header">
+                <div class="filter-bar" style="width: 100%;">
+                    <div class="chip-group">
+                        <button class="chip active" id="chip-all" onclick="setLibraryFilter('all')">Tümü</button>
+                        <button class="chip" id="chip-movie" onclick="setLibraryFilter('movie')">Filmler</button>
+                        <button class="chip" id="chip-show" onclick="setLibraryFilter('show')">Diziler</button>
+                        <button class="chip" id="chip-missing" onclick="setLibraryFilter('missing')">Arananlar</button>
+                    </div>
+                    <input type="text" id="lib-local-filter" class="lib-filter-input" oninput="renderLibraryList()" placeholder="Kütüphanede filtrele...">
+                </div>
+            </div>
+            <div class="lib-list" id="lib-items-list">
+                <div class="empty-state" data-i18n="loadingText">Yükleniyor...</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =========================================================
+         VIEW 3: YÖNETİM (Admin & Granular Service Controls)
+         ========================================================= -->
+    <section class="view-panel" id="view-admin">
+
+        <!-- System Maintenance & Disk Bar -->
+        <div class="panel-box">
+            <div class="panel-header">
+                <div class="panel-title">🛠️ <span data-i18n="adminSystemTitle">Sistem & Disk Yönetimi</span></div>
+                <div class="tools-strip">
+                    <button class="btn btn-sm" id="update-badge" onclick="checkUpdatesNow()">🔄 Güncellemeleri Kontrol Et</button>
+                    <button class="btn btn-sm" onclick="openDiskSelectModal()" data-i18n="diskSelectBtn">⚙️ Disk Seç</button>
+                    <button class="btn btn-sm btn-sleep" id="admin-sleep-btn" onclick="sleepExternalDisk()" style="display: none;" data-i18n="diskSleepBtn">🌙 Diski Uyut</button>
+                    <button class="btn btn-sm btn-wake" id="admin-wake-btn" onclick="wakeExternalDisk()" style="display: none;" data-i18n="diskWakeBtn">⚡ Diski Uyandır</button>
+                    <button class="btn btn-sm btn-primary" id="admin-transfer-btn" onclick="handleOverviewTransferClick()" style="display: none;" data-i18n="moveToDisk">📦 Diske Aktar</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Group 1: Cinema Services -->
+        <div class="panel-box" id="svc-group-plex">
+            <div class="panel-header">
+                <div class="panel-title">🎬 <span data-i18n="modeStream">Sinema & İzleme</span></div>
+                <span class="badge off" id="svc-group-plex-count">0 / 2</span>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-plex"></span>
+                    <div>
+                        <div class="svc-name">Plex Media Server</div>
+                        <div class="svc-role" id="sub-app-plex">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:32400</span>
+                    <a href="#" data-port="32400" data-path="/web" data-protocol="http" target="_blank" class="btn btn-sm disabled-link" id="link-app-plex" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-plex-toggle" onchange="triggerAction('toggle-app', 'plex')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-plextraktsync"></span>
+                    <div>
+                        <div class="svc-name">PlexTraktSync</div>
+                        <div class="svc-role" id="sub-app-plextraktsync">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <button class="btn btn-sm" id="trakt-sync-btn" onclick="syncTraktWatchlistNow()" data-i18n="syncBtn">Eşitle</button>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-plextraktsync-toggle" onchange="triggerAction('toggle-app', 'plextraktsync')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Group 2: Download Services -->
+        <div class="panel-box" id="svc-group-downloads">
+            <div class="panel-header">
+                <div class="panel-title">📥 <span data-i18n="modeDownload">Kütüphane & İndirme</span></div>
+                <span class="badge off" id="svc-group-downloads-count">0 / 5</span>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-radarr"></span>
+                    <div>
+                        <div class="svc-name" data-i18n="appRadarr">Radarr (Filmler)</div>
+                        <div class="svc-role" id="sub-app-radarr">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:7878</span>
+                    <a href="#" data-port="7878" target="_blank" class="btn btn-sm disabled-link" id="link-app-radarr" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-radarr-toggle" onchange="triggerAction('toggle-app', 'radarr')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-sonarr"></span>
+                    <div>
+                        <div class="svc-name" data-i18n="appSonarr">Sonarr (Diziler)</div>
+                        <div class="svc-role" id="sub-app-sonarr">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:8989</span>
+                    <a href="#" data-port="8989" target="_blank" class="btn btn-sm disabled-link" id="link-app-sonarr" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-sonarr-toggle" onchange="triggerAction('toggle-app', 'sonarr')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-qbittorrent"></span>
+                    <div>
+                        <div class="svc-name">qBittorrent</div>
+                        <div class="svc-role" id="sub-app-qbittorrent">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:8080</span>
+                    <a href="#" data-port="8080" target="_blank" class="btn btn-sm disabled-link" id="link-app-qbittorrent" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-qbittorrent-toggle" onchange="triggerAction('toggle-app', 'qbittorrent')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-prowlarr"></span>
+                    <div>
+                        <div class="svc-name">Prowlarr (Indexer)</div>
+                        <div class="svc-role" id="sub-app-prowlarr">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:9696</span>
+                    <a href="#" data-port="9696" target="_blank" class="btn btn-sm disabled-link" id="link-app-prowlarr" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-prowlarr-toggle" onchange="triggerAction('toggle-app', 'prowlarr')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-flaresolverr"></span>
+                    <div>
+                        <div class="svc-name">FlareSolverr</div>
+                        <div class="svc-role" id="sub-app-flaresolverr">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:8191</span>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-flaresolverr-toggle" onchange="triggerAction('toggle-app', 'flaresolverr')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Group 3: Music Services -->
+        <div class="panel-box" id="svc-group-music">
+            <div class="panel-header">
+                <div class="panel-title">🎵 <span data-i18n="modeMusic">Müzik Arşivi</span></div>
+                <span class="badge off" id="svc-group-music-count">0 / 3</span>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-slskd"></span>
+                    <div>
+                        <div class="svc-name">Slskd (FLAC)</div>
+                        <div class="svc-role" id="sub-app-slskd">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:5030</span>
+                    <a href="#" data-port="5030" target="_blank" class="btn btn-sm disabled-link" id="link-app-slskd" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-slskd-toggle" onchange="triggerAction('toggle-app', 'slskd')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-metube"></span>
+                    <div>
+                        <div class="svc-name">MeTube (YouTube)</div>
+                        <div class="svc-role" id="sub-app-metube">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:8081</span>
+                    <a href="#" data-port="8081" target="_blank" class="btn btn-sm disabled-link" id="link-app-metube" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-metube-toggle" onchange="triggerAction('toggle-app', 'metube')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-beets"></span>
+                    <div>
+                        <div class="svc-name" data-i18n="appBeets">Beets (Etiketleme)</div>
+                        <div class="svc-role" id="sub-app-beets">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <button class="btn btn-sm" id="beets-tag-btn" onclick="triggerAction('music-sync', '')" data-i18n="tagBtn" disabled>Etiketle ⚡</button>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-beets-toggle" onchange="triggerAction('toggle-app', 'beets')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Expert / Advanced Application & Service Settings (Collapsed by Default) -->
+        <details class="panel-box settings-accordion" id="admin-settings-panel" ontoggle="if (this.open) loadSettings();">
+            <summary>
+                <div class="settings-summary-left">
+                    <div class="panel-title">⚙️ <span data-i18n="settingsTitle">Gelişmiş Uygulama & Servis Ayarları</span></div>
+                    <span class="settings-summary-sub" data-i18n="settingsSummarySub">Otomasyon, hız limitleri, ağ, port ve servis ince ayarları</span>
+                </div>
+                <span class="settings-chevron">▾</span>
+            </summary>
+            <form class="settings-body" onsubmit="event.preventDefault(); saveSettings();">
+                <div class="settings-group-title" data-i18n="setGroupDownloads">📥 İndirme, Hız & Kütüphane</div>
+                <div class="settings-grid">
+                    <div class="field">
+                        <label for="set-watched-action" data-i18n="lblWatchedAction">İzlenen İçerik Politikası</label>
+                        <select id="set-watched-action">
+                            <option value="keep" data-i18n="optWatchedKeep">Dosyayı koru (sadece izleme listesinden düş)</option>
+                            <option value="delete_after_rating" data-i18n="optWatchedRating">Puanlandıktan sonra diskten & izleme listesinden sil</option>
+                            <option value="delete_after_24h" data-i18n="optWatched24h">24 saat sonra diskten & izleme listesinden sil</option>
+                            <option value="delete_immediate" data-i18n="optWatchedImmediate">İzlendiğinde diskten & izleme listesinden sil</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="set-sync-minutes" data-i18n="lblSyncMinutes">Watchlist Eşitleme Aralığı (dk)</label>
+                        <input type="number" id="set-sync-minutes" min="1" max="180" value="5">
+                    </div>
+                    <div class="field">
+                        <label for="set-dl-limit" data-i18n="lblDlLimit">İndirme Hız Limiti (MB/s • 0: Sınırsız)</label>
+                        <input type="number" id="set-dl-limit" min="0" step="0.5" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="set-up-limit" data-i18n="lblUpLimit">Yükleme / Seed Limiti (KB/s • 0: Sınırsız)</label>
+                        <input type="number" id="set-up-limit" min="0" step="10" value="0">
+                    </div>
+                    <div class="field-toggle" style="grid-column: 1 / -1;">
+                        <span data-i18n="lblAutoRename">Otomatik Dosya Temizleme ({tmdb}/{tvdb})</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-auto-rename" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-group-title" data-i18n="setGroupNetwork">🎬 Plex, Trakt & Ağ</div>
+                <div class="settings-grid">
+                    <div class="field">
+                        <label for="set-plex-ip" data-i18n="lblPlexIp">Plex Ağ Adresi (Advertise IP)</label>
+                        <input type="text" id="set-plex-ip" placeholder="http://192.168.1.x:32400">
+                    </div>
+                    <div class="field">
+                        <label for="set-plex-host" data-i18n="lblPlexHost">Plex Sunucu Adı</label>
+                        <input type="text" id="set-plex-host" placeholder="podmedia">
+                    </div>
+                    <div class="field">
+                        <label for="set-allowed-hosts" data-i18n="lblAllowedHosts">Yerel Ağ Erişimi (Allowed Hosts)</label>
+                        <input type="text" id="set-allowed-hosts" placeholder="localhost,127.0.0.1,*.local,192.168.1.x">
+                    </div>
+                    <div class="field">
+                        <label for="set-tz" data-i18n="lblTimezone">Saat Dilimi (TZ)</label>
+                        <input type="text" id="set-tz" placeholder="Europe/Istanbul">
+                    </div>
+                    <div class="field" id="trakt-threshold-field" style="display: none;">
+                        <label for="set-trakt-threshold" data-i18n="lblTraktThreshold">Trakt İzlenmiş Sayma Eşiği (%)</label>
+                        <input type="number" id="set-trakt-threshold" min="50" max="99" value="80">
+                    </div>
+                    <div class="field-toggle" id="trakt-ratings-field" style="display: none; align-self: end;">
+                        <span data-i18n="lblTraktRatings">Trakt Yıldız Puanı Eşitleme</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-trakt-ratings" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="field-toggle" id="trakt-watched-field" style="display: none; grid-column: 1 / -1;">
+                        <span data-i18n="lblTraktWatched">Trakt İzlenme Geçmişi Eşitleme</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-trakt-watched" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-group-title" data-i18n="setGroupSystem">🛠️ Sistem</div>
+                <div class="settings-grid">
+                    <div class="field">
+                        <label for="set-server-port" data-i18n="lblPort">PodMedia Panel Portu</label>
+                        <input type="number" id="set-server-port" min="1024" max="65535" value="3000">
+                    </div>
+                    <div class="field-toggle" style="align-self: end;">
+                        <span data-i18n="lblAutoUpdate">Otomatik Konteyner Güncelleme</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-auto-update" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="settings-footer">
+                    <button type="button" class="btn" id="btn-reset-settings" onclick="resetSettingsToDefaults()" data-i18n="resetSettingsBtn">↺ Varsayılanlara Sıfırla</button>
+                    <div class="settings-actions">
+                        <span class="settings-msg" id="settings-save-msg"></span>
+                        <button type="submit" class="btn btn-primary" id="btn-save-settings" data-i18n="saveSettingsBtn">💾 Kaydet</button>
+                    </div>
+                </div>
+            </form>
+        </details>
+    </section>
+
+    <!-- CONSOLE MODAL -->
     <div class="modal-overlay" id="modal-overlay">
         <div class="modal">
             <div class="modal-header">
-                <div class="modal-title" id="modal-title">⚙️ Executing Podman Action...</div>
+                <div class="modal-title" id="modal-title">⚙️ İşlem Yürütülüyor...</div>
             </div>
             <div class="progress-bar-bg">
                 <div class="progress-bar-fill" id="progress-fill"></div>
             </div>
-            <pre class="terminal" id="terminal-out">Awaiting Podman logs...</pre>
+            <pre class="terminal" id="terminal-out">...</pre>
         </div>
     </div>
 
-    <!-- FLOATING TRANSFER MINI BAR (Non-blocking) -->
+    <!-- FLOATING TRANSFER BAR -->
     <div class="transfer-floating" id="transfer-floating" style="display: none;" onclick="openTransferModal()">
         <div class="floating-content">
             <div class="floating-spinner"></div>
             <div>
-                <div class="floating-title">📦 Harici Diske Aktarılıyor... (<span id="float-percent">0%</span>)</div>
+                <div class="floating-title">📦 <span data-i18n="floatingTransferring">Harici Diske Aktarılıyor</span> (<span id="float-percent">0%</span>)</div>
                 <div class="floating-meta"><span id="float-file">...</span> • <span id="float-speed">0 MB/s</span></div>
             </div>
         </div>
-        <button class="btn-float-details" onclick="event.stopPropagation(); openTransferModal();">Detaylar ↗</button>
+        <button class="btn btn-sm" onclick="event.stopPropagation(); openTransferModal();" data-i18n="detailsBtn">Detaylar ↗</button>
     </div>
 
-    <!-- DEDICATED TRANSFER PROGRESS & CONTROL MODAL -->
+    <!-- TRANSFER MODAL -->
     <div class="modal-overlay" id="transfer-modal-overlay" style="display: none;">
-        <div class="modal transfer-modal">
+        <div class="modal">
             <div class="modal-header">
-                <div class="modal-title">📦 Harici Diske Veri Aktarımı</div>
-                <button class="btn-close-modal" onclick="closeTransferModal()" title="Arka plana al (Aktarımı durdurmaz)">✕</button>
+                <div class="modal-title" data-i18n="transferModalTitle">📦 Harici Diske Veri Aktarımı</div>
+                <button class="btn-close-modal" onclick="closeTransferModal()">✕</button>
             </div>
-            
             <div class="transfer-body">
                 <div class="transfer-section">
                     <div class="t-row">
-                        <span class="t-label">Genel İlerleme</span>
+                        <span class="t-label" data-i18n="overallProgress">Genel İlerleme</span>
                         <span class="t-val" id="t-overall-text">0 GB / 0 GB (%0)</span>
                     </div>
                     <div class="progress-bar-bg" style="height: 8px; border-radius: 4px;">
                         <div class="progress-bar-fill" id="t-overall-fill" style="width: 0%;"></div>
                     </div>
                 </div>
-
                 <div class="transfer-section">
                     <div class="t-row">
-                        <span class="t-label" style="max-width: 75%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
-                            Mevcut Dosya: <b id="t-current-filename">-</b>
+                        <span class="t-label" style="max-width: 72%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                            <span data-i18n="currentFile">Mevcut Dosya:</span> <b id="t-current-filename">-</b>
                         </span>
                         <span class="t-val" id="t-file-text">0 MB / 0 MB (%0)</span>
                     </div>
@@ -1010,31 +1753,24 @@
                         <div class="progress-bar-fill file-fill" id="t-file-fill" style="width: 0%;"></div>
                     </div>
                 </div>
-
                 <div class="t-metrics-grid">
                     <div class="t-metric-card">
-                        <div class="t-metric-lbl">Aktarım Hızı</div>
+                        <div class="t-metric-lbl" data-i18n="speedLbl">Hız</div>
                         <div class="t-metric-val" id="t-speed">0 MB/s</div>
                     </div>
                     <div class="t-metric-card">
-                        <div class="t-metric-lbl">Tahmini Kalan Süre</div>
+                        <div class="t-metric-lbl" data-i18n="etaLbl">Kalan Süre</div>
                         <div class="t-metric-val" id="t-eta">-</div>
                     </div>
                     <div class="t-metric-card">
-                        <div class="t-metric-lbl">Aktarılan Dosya</div>
+                        <div class="t-metric-lbl" data-i18n="filesLbl">Dosya</div>
                         <div class="t-metric-val" id="t-files-count">0 / 0</div>
                     </div>
                 </div>
-
-                <div class="t-status-msg" id="t-status-msg">Hazırlanıyor...</div>
-
+                <div class="t-status-msg" id="t-status-msg">...</div>
                 <div class="t-actions">
-                    <button class="btn-t-graceful" id="btn-t-graceful" onclick="stopTransfer('graceful')">
-                        ⏸️ Kontrollü Durdur (Bu Dosyadan Sonra)
-                    </button>
-                    <button class="btn-t-immediate" id="btn-t-immediate" onclick="stopTransfer('immediate')">
-                        🛑 Hemen Durdur (İptal & Geri Al)
-                    </button>
+                    <button class="btn-t-graceful" id="btn-t-graceful" onclick="stopTransfer('graceful')" data-i18n="stopGraceful">⏸️ Bu Dosyadan Sonra Durdur</button>
+                    <button class="btn-t-immediate" id="btn-t-immediate" onclick="stopTransfer('immediate')" data-i18n="stopImmediate">🛑 Hemen İptal Et</button>
                 </div>
             </div>
         </div>
@@ -1042,18 +1778,16 @@
 
     <!-- DISK SELECTION MODAL -->
     <div class="modal-overlay" id="disk-modal-overlay" style="display: none;">
-        <div class="modal" style="max-width: 550px;">
+        <div class="modal" style="max-width: 540px;">
             <div class="modal-header">
-                <div class="modal-title">💾 Harici Depolama Diski Seçimi</div>
+                <div class="modal-title" data-i18n="diskModalTitle">💾 Harici Depolama Diski Seçimi</div>
                 <button class="btn-close-modal" onclick="closeDiskSelectModal()">✕</button>
             </div>
-            <div style="padding: 18px 20px;">
-                <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4;">
-                    Film ve dizi arşivlerinin taşınacağı harici diski seçin. Seçilen disk gelecekte farklı bir sürücü harfi (E:, F:, Z:) alsa bile seri numarasından otomatik olarak tanınacaktır.
+            <div style="padding: 16px 18px;">
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 14px; line-height: 1.45;" data-i18n="diskModalDesc">
+                    Film ve dizi arşivlerinin taşınacağı harici diski seçin. Seçilen disk farklı bir sürücü harfi alsa bile seri numarasından otomatik tanınır.
                 </p>
-                <div id="disk-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto;">
-                    <div style="text-align: center; color: var(--text-muted); padding: 20px;">Sürücüler taranıyor...</div>
-                </div>
+                <div id="disk-list" style="display: flex; flex-direction: column; gap: 10px; max-height: 320px; overflow-y: auto;"></div>
             </div>
         </div>
     </div>
@@ -1062,327 +1796,1018 @@
         let isSystemBusy = false;
         let anyRunning = false;
         let eventSource = null;
+        let lastStatusData = null;
+        let lastHubSummary = null;
+        let libraryFilter = 'all';
 
+        const I18N = {
+            tr: {
+                tabOverview: 'Ana Sayfa',
+                tabLibrary: 'Kütüphane',
+                tabAdmin: 'Yönetim',
+                secModes: 'Medya Modları',
+                secIntegrations: 'Bağlı Entegrasyonlar & Depolama',
+                processing: 'İşleniyor...',
+                startAll: '▶️ Başlat',
+                stopAll: '🛑 Durdur',
+                quitBtn: '⏻ Kapat',
+                quitConfirm: "PodMedia'yı ve tüm çalışan servisleri durdurup harici diski serbest bırakmak istiyor musunuz?",
+                autoUpdateActive: '🔄 Güncellemeleri Kontrol Et',
+                autoUpdateScanning: '⏳ Kontrol ediliyor...',
+                autoUpdateUpToDate: '✓ Sistem Güncel',
+                diskSelectBtn: '⚙️ Disk Seç',
+                diskSleepBtn: '🌙 Diski Uyut',
+                diskWakeBtn: '⚡ Diski Uyandır',
+                diskSleepNeedStop: 'Diski uyutmak için önce tüm servisleri durdurun (Durdur).',
+                modeStream: 'Sinema & İzleme',
+                modeStreamDesc: 'Film ve dizilerini TV, telefon veya tarayıcıdan izle.',
+                modeDownload: 'Kütüphane & İndirme',
+                modeDownloadDesc: 'İzleme listendeki film ve dizileri otomatik bulup indirir.',
+                modeMusic: 'Müzik Arşivi',
+                modeMusicDesc: 'Yüksek kaliteli müzik indir ve kütüphaneni otomatik etiketle.',
+                openPlayer: 'Oynatıcıyı Aç ↗',
+                openLibrary: 'Kütüphaneyi Aç →',
+                organizeMusic: 'Arşivi Düzenle ⚡',
+                manageBtn: 'Yönet',
+                liveDownloadsTitle: 'Aktif İndirmeler',
+                viewAllLibrary: 'Kütüphanede Gör →',
+                syncWatchlist: '🔄 Watchlist Eşitle',
+                syncingLong: '⏳ Eşitleniyor...',
+                syncedLong: '✓ Eşitlendi',
+                moveToDisk: '📦 Diske Aktar',
+                searchPlaceholder: 'Film veya dizi ara ve tek tıkla kütüphaneye ekle...',
+                filterPlaceholder: 'Kütüphanede filtrele...',
+                optAll: 'Film & Dizi',
+                optMovies: 'Sadece Film',
+                optShows: 'Sadece Dizi',
+                searchAddBtn: '🔍 Ara',
+                searchingBtn: '⏳ Aranıyor...',
+                addDownloadBtn: '＋ Ekle & İndir',
+                addedBadge: '✓ Kütüphanede',
+                queueTitle: 'İndirme Kuyruğu',
+                noActiveDownloads: 'Şu an aktif indirme yok.',
+                downloadsOffline: 'İndirme Modu kapalı. Kütüphaneyi ve indirme kuyruğunu görmek için başlatın.',
+                startDownloadsNow: '📥 İndirme Modunu Başlat',
+                chipAll: 'Tümü',
+                chipMovies: 'Filmler',
+                chipShows: 'Diziler',
+                chipMissing: 'Arananlar',
+                statusReady: 'Hazır',
+                statusWanted: 'Aranıyor',
+                typeMovie: 'Film',
+                typeShow: 'Dizi',
+                adminSystemTitle: 'Sistem & Disk Yönetimi',
+                settingsTitle: 'Gelişmiş Uygulama & Servis Ayarları',
+                settingsSummarySub: 'Otomasyon, hız limitleri, ağ, port ve servis ince ayarları',
+                setGroupDownloads: '📥 İndirme, Hız & Kütüphane',
+                setGroupNetwork: '🎬 Plex, Trakt & Ağ',
+                setGroupSystem: '🛠️ Sistem',
+                restartHint: 'Değişikliklerin aktif olması için yeniden başlatın',
+                lblPort: 'PodMedia Panel Portu',
+                lblWatchedAction: 'İzlenen İçerik Politikası',
+                optWatchedKeep: 'Dosyayı koru (sadece izleme listesinden düş)',
+                optWatchedRating: 'Puanlandıktan sonra diskten & izleme listesinden sil',
+                optWatched24h: '24 saat sonra diskten & izleme listesinden sil',
+                optWatchedImmediate: 'İzlendiğinde diskten & izleme listesinden sil',
+                lblSyncMinutes: 'Watchlist Eşitleme Aralığı (dk)',
+                lblDlLimit: 'İndirme Hız Limiti (MB/s • 0: Sınırsız)',
+                lblUpLimit: 'Yükleme / Seed Limiti (KB/s • 0: Sınırsız)',
+                lblAutoRename: 'Otomatik Dosya Temizleme ({tmdb}/{tvdb})',
+                lblAllowedHosts: 'Yerel Ağ Erişimi (Allowed Hosts)',
+                lblPlexIp: 'Plex Ağ Adresi (Advertise IP)',
+                lblPlexHost: 'Plex Sunucu Adı',
+                lblTimezone: 'Saat Dilimi (TZ)',
+                lblTraktThreshold: 'Trakt İzlenmiş Sayma Eşiği (%)',
+                lblAutoUpdate: 'Otomatik Konteyner Güncelleme',
+                lblTraktRatings: 'Trakt Yıldız Puanı Eşitleme',
+                lblTraktWatched: 'Trakt İzlenme Geçmişi Eşitleme',
+                saveSettingsBtn: '💾 Kaydet',
+                savingBtn: '⏳ Kaydediliyor...',
+                resetSettingsBtn: '↺ Varsayılanlara Sıfırla',
+                resetConfirm: 'Tüm uygulama ve servis ayarları başlangıç değerlerine döndürülsün mü? (Hesaplarınız ve kütüphaneniz korunur)',
+                podmediaRestartConfirm: 'Panel portu değiştiği için PodMedia uygulamasının yeniden başlatılması gerekiyor. Şimdi yeniden başlatılsın mı?',
+                settingsSaved: '✓ Ayarlar kaydedildi ve uygulandı.',
+                settingsSavedRestarting: '✓ Kaydedildi, etkilenen servisler yeniden başlatılıyor...',
+                settingsResetDone: '✓ Varsayılan ayarlara dönüldü.',
+                transferViewBtn: '📊 Aktarım Detayı ↗',
+                diskCapLine: (u, tot, pct, f) => `<b>${u}</b> / ${tot} GB (%${pct}) • <b>${f} GB</b> boş`,
+                diskConnectedOnly: 'Bağlı',
+                openUi: 'Aç ↗',
+                appRadarr: 'Radarr (Filmler)',
+                appSonarr: 'Sonarr (Diziler)',
+                appBeets: 'Beets (Etiketleme)',
+                tagBtn: 'Etiketle ⚡',
+                syncBtn: 'Eşitle',
+                connected: 'Bağlı',
+                notConnected: 'Kurulu Değil',
+                running: 'Aktif',
+                stopped: 'Kapalı',
+                traktNotConfigured: 'Kurulu değil (login gerekli)',
+                plexMetaConnected: (u, s) => `Hesap: <b>${u || '-'}</b>${s ? ` • Sunucu: <b>${s}</b>` : ''}`,
+                plexMetaOff: 'Plex hesabı henüz yapılandırılmamış.',
+                traktMetaConnected: (u, cnt) => `Hesap: <b>${u || '-'}</b>${cnt !== null ? ` • <b>${cnt}</b> Watchlist öğesi` : ''}`,
+                traktMetaOff: 'Trakt.tv entegrasyonu henüz kurulmamış.',
+                libStatSummary: (m, s) => `${m} film • ${s} dizi`,
+                diskFallback: 'Harici Arşiv Diski',
+                diskNotAttached: 'Takılı Değil',
+                diskConnectedFree: (gb) => `Bağlı • ${gb} GB Boş`,
+                storageHeroSub: 'Hibrit yerel + harici medya depolama',
+                usedCapacity: (u, tot, pct) => `Kullanılan: <b>${u} GB</b> / ${tot} GB (%${pct})`,
+                freeCapacity: (f) => `Boş Alan: <b>${f} GB</b>`,
+                ecoSystemTitle: 'Sistem & Servisler',
+                ecoSystemSub: 'Otomatik konteyner güncelleme aktif',
+                checkUpdatesShort: '🔄 Güncelle',
+                openAdminBtn: 'Yönetim Paneli →',
+                activeDlPill: (n, spd) => spd > 0 ? `⬇ ${n} iniyor • ${spd} MB/s` : `⬇ ${n} aktif`,
+                transferringMeta: (pct, spd) => `Aktarım sürüyor: <b>%${pct}</b> (${spd} MB/s)`,
+                pendingMeta: (tot, mov, ser) => `Yerelde aktarılmayı bekleyen <b>${tot} GB</b> var (Film: ${mov} GB, Dizi: ${ser} GB).`,
+                transferBtn: (tot) => `📦 Harici Diske Aktar (${tot} GB)`,
+                allExternalMeta: '✓ Yerel disk tertemiz — tüm film ve diziler harici diskte arşivlenmiş.',
+                allExternalBtn: '✓ Arşiv Güncel',
+                disconnectedMeta: (tot) => `Yerelde <b>${tot} GB</b> bekliyor. Aktarmak için harici diski takın veya uyandırın.`,
+                disconnectedBtn: '💾 Disk Bağlı Değil',
+                floatingTransferring: 'Harici Diske Aktarılıyor',
+                detailsBtn: 'Detaylar ↗',
+                transferModalTitle: '📦 Harici Diske Veri Aktarımı',
+                overallProgress: 'Genel İlerleme',
+                currentFile: 'Mevcut Dosya:',
+                speedLbl: 'Hız',
+                etaLbl: 'Kalan Süre',
+                filesLbl: 'Dosya',
+                stopGraceful: '⏸️ Bu Dosyadan Sonra Durdur',
+                stopImmediate: '🛑 Hemen İptal Et',
+                diskModalTitle: '💾 Harici Depolama Diski Seçimi',
+                diskModalDesc: 'Film ve dizi arşivlerinin taşınacağı harici diski seçin. Seçilen disk farklı bir sürücü harfi alsa bile seri numarasından otomatik tanınır.',
+                loadingText: 'Yükleniyor...'
+            },
+            en: {
+                tabOverview: 'Home',
+                tabLibrary: 'Library',
+                tabAdmin: 'Admin',
+                secModes: 'Media Modes',
+                secIntegrations: 'Connected Integrations & Storage',
+                processing: 'Processing...',
+                startAll: '▶️ Start All',
+                stopAll: '🛑 Stop All',
+                quitBtn: '⏻ Quit',
+                quitConfirm: 'Stop PodMedia and all running services, and safely release external drives?',
+                autoUpdateActive: '🔄 Check Updates',
+                autoUpdateScanning: '⏳ Checking...',
+                autoUpdateUpToDate: '✓ Up to Date',
+                diskSelectBtn: '⚙️ Disk',
+                diskSleepBtn: '🌙 Sleep Disk',
+                diskWakeBtn: '⚡ Wake Disk',
+                diskSleepNeedStop: 'Stop all running services before sleeping the external drive.',
+                modeStream: 'Cinema & Watch',
+                modeStreamDesc: 'Stream your movies and shows on TV, mobile, or web.',
+                modeDownload: 'Library & Downloads',
+                modeDownloadDesc: 'Automatically finds and downloads titles from your watchlist.',
+                modeMusic: 'Music Library',
+                modeMusicDesc: 'Download lossless audio and automatically organize your music.',
+                openPlayer: 'Open Player ↗',
+                openLibrary: 'Open Library →',
+                organizeMusic: 'Organize Music ⚡',
+                manageBtn: 'Manage',
+                liveDownloadsTitle: 'Active Downloads',
+                viewAllLibrary: 'View in Library →',
+                syncWatchlist: '🔄 Sync Watchlist',
+                syncingLong: '⏳ Syncing...',
+                syncedLong: '✓ Synced',
+                moveToDisk: '📦 Move to Disk',
+                searchPlaceholder: 'Search any movie or show to add & download in one click...',
+                filterPlaceholder: 'Filter library...',
+                optAll: 'Movies & Shows',
+                optMovies: 'Movies Only',
+                optShows: 'Shows Only',
+                searchAddBtn: '🔍 Search',
+                searchingBtn: '⏳ Searching...',
+                addDownloadBtn: '＋ Add & Download',
+                addedBadge: '✓ In Library',
+                queueTitle: 'Download Queue',
+                noActiveDownloads: 'No active downloads right now.',
+                downloadsOffline: 'Download Mode is off. Start it to browse your library and queue.',
+                startDownloadsNow: '📥 Start Download Mode',
+                chipAll: 'All',
+                chipMovies: 'Movies',
+                chipShows: 'Shows',
+                chipMissing: 'Wanted',
+                statusReady: 'Ready',
+                statusWanted: 'Wanted',
+                typeMovie: 'Movie',
+                typeShow: 'Show',
+                adminSystemTitle: 'System & Disk Management',
+                settingsTitle: 'Advanced Application & Service Settings',
+                settingsSummarySub: 'Automation, speed limits, network, port & service fine-tuning',
+                setGroupDownloads: '📥 Downloads, Speed & Library',
+                setGroupNetwork: '🎬 Plex, Trakt & Network',
+                setGroupSystem: '🛠️ System',
+                restartHint: 'Restart required to apply changes',
+                lblPort: 'PodMedia Panel Port',
+                lblWatchedAction: 'Watched Media Policy',
+                optWatchedKeep: 'Keep file on disk (remove from watchlist only)',
+                optWatchedRating: 'Delete from disk & watchlist after rating',
+                optWatched24h: 'Delete from disk & watchlist after 24 hours',
+                optWatchedImmediate: 'Delete from disk & watchlist after watching',
+                lblSyncMinutes: 'Watchlist Sync Interval (min)',
+                lblDlLimit: 'Download Speed Limit (MB/s • 0: Unlimited)',
+                lblUpLimit: 'Upload / Seed Limit (KB/s • 0: Unlimited)',
+                lblAutoRename: 'Auto Clean Filenames ({tmdb}/{tvdb})',
+                lblAllowedHosts: 'Local Network Access (Allowed Hosts)',
+                lblPlexIp: 'Plex Advertise IP',
+                lblPlexHost: 'Plex Server Hostname',
+                lblTimezone: 'Timezone (TZ)',
+                lblTraktThreshold: 'Trakt Scrobble Threshold (%)',
+                lblAutoUpdate: 'Automatic Container Updates',
+                lblTraktRatings: 'Sync Trakt Ratings',
+                lblTraktWatched: 'Sync Trakt Watch History',
+                saveSettingsBtn: '💾 Save',
+                savingBtn: '⏳ Saving...',
+                resetSettingsBtn: '↺ Reset to Defaults',
+                resetConfirm: 'Reset all application and service settings to defaults? (Your accounts and library stay intact)',
+                podmediaRestartConfirm: 'PodMedia needs to restart to apply the new panel port. Restart PodMedia now?',
+                settingsSaved: '✓ Settings saved and applied.',
+                settingsSavedRestarting: '✓ Saved — restarting affected services...',
+                settingsResetDone: '✓ Restored default settings.',
+                transferViewBtn: '📊 Transfer Details ↗',
+                diskCapLine: (u, tot, pct, f) => `<b>${u}</b> / ${tot} GB (${pct}%) • <b>${f} GB</b> free`,
+                diskConnectedOnly: 'Connected',
+                openUi: 'Open ↗',
+                appRadarr: 'Radarr (Movies)',
+                appSonarr: 'Sonarr (TV Shows)',
+                appBeets: 'Beets (Tagging)',
+                tagBtn: 'Tag ⚡',
+                syncBtn: 'Sync',
+                connected: 'Connected',
+                notConnected: 'Not Configured',
+                running: 'Active',
+                stopped: 'Off',
+                traktNotConfigured: 'Not configured (login required)',
+                plexMetaConnected: (u, s) => `Account: <b>${u || '-'}</b>${s ? ` • Server: <b>${s}</b>` : ''}`,
+                plexMetaOff: 'Plex account is not configured yet.',
+                traktMetaConnected: (u, cnt) => `Account: <b>${u || '-'}</b>${cnt !== null ? ` • <b>${cnt}</b> Watchlist items` : ''}`,
+                traktMetaOff: 'Trakt.tv integration is not set up yet.',
+                libStatSummary: (m, s) => `${m} movies • ${s} shows`,
+                diskFallback: 'External Archive Disk',
+                diskNotAttached: 'Offline',
+                diskConnectedFree: (gb) => `Connected • ${gb} GB Free`,
+                storageHeroSub: 'Hybrid local + external media storage',
+                usedCapacity: (u, tot, pct) => `Used: <b>${u} GB</b> / ${tot} GB (${pct}%)`,
+                freeCapacity: (f) => `Free: <b>${f} GB</b>`,
+                ecoSystemTitle: 'System & Services',
+                ecoSystemSub: 'Automatic container updates active',
+                checkUpdatesShort: '🔄 Updates',
+                openAdminBtn: 'Admin Panel →',
+                activeDlPill: (n, spd) => spd > 0 ? `⬇ ${n} active • ${spd} MB/s` : `⬇ ${n} active`,
+                transferringMeta: (pct, spd) => `Transferring: <b>${pct}%</b> (${spd} MB/s)`,
+                pendingMeta: (tot, mov, ser) => `<b>${tot} GB</b> pending local transfer (Movies: ${mov} GB, Shows: ${ser} GB).`,
+                transferBtn: (tot) => `📦 Move to Disk (${tot} GB)`,
+                allExternalMeta: '✓ Local disk is clean — all movies and shows are archived externally.',
+                allExternalBtn: '✓ Up to Date',
+                disconnectedMeta: (tot) => `<b>${tot} GB</b> pending locally. Connect or wake the external disk to transfer.`,
+                disconnectedBtn: '💾 Disk Offline',
+                floatingTransferring: 'Transferring to Disk',
+                detailsBtn: 'Details ↗',
+                transferModalTitle: '📦 External Disk Transfer',
+                overallProgress: 'Overall Progress',
+                currentFile: 'Current File:',
+                speedLbl: 'Speed',
+                etaLbl: 'ETA',
+                filesLbl: 'Files',
+                stopGraceful: '⏸️ Stop After Current File',
+                stopImmediate: '🛑 Cancel Now',
+                diskModalTitle: '💾 Select External Storage Disk',
+                diskModalDesc: 'Choose the external drive for archiving movies and TV shows. Recognized automatically by serial number even if the drive letter changes.',
+                loadingText: 'Loading...'
+            }
+        };
+
+        let currentLang = localStorage.getItem('podmedia_lang') || 'tr';
+        let currentTheme = localStorage.getItem('podmedia_theme') || 'light';
+
+        function t(key) {
+            return (I18N[currentLang] && I18N[currentLang][key]) || I18N.tr[key] || key;
+        }
+
+        function switchView(viewName) {
+            document.querySelectorAll('.view-panel').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(b => b.classList.remove('active'));
+            const panel = document.getElementById(`view-${viewName}`);
+            const tab = document.getElementById(`tab-${viewName}`);
+            if (panel) panel.classList.add('active');
+            if (tab) tab.classList.add('active');
+            if (viewName === 'library') fetchHubSummary(true);
+            if (viewName === 'admin') loadSettings();
+        }
+
+        function openAdminSection(sectionId) {
+            switchView('admin');
+            const el = document.getElementById(sectionId);
+            if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 40);
+        }
+
+        function applyTheme() {
+            document.documentElement.setAttribute('data-theme', currentTheme);
+            const btn = document.getElementById('theme-toggle-btn');
+            if (btn) btn.innerText = currentTheme === 'light' ? '🌙' : '☀️';
+        }
+
+        function toggleTheme() {
+            currentTheme = currentTheme === 'light' ? 'dark' : 'light';
+            localStorage.setItem('podmedia_theme', currentTheme);
+            applyTheme();
+        }
+
+        function applyLanguage() {
+            document.documentElement.lang = currentLang;
+            const langBtn = document.getElementById('lang-toggle-btn');
+            if (langBtn) langBtn.innerText = currentLang.toUpperCase();
+
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if (I18N[currentLang] && typeof I18N[currentLang][key] === 'string') {
+                    el.innerText = I18N[currentLang][key];
+                }
+            });
+
+            const sInp = document.getElementById('media-search-input');
+            if (sInp) sInp.placeholder = t('searchPlaceholder');
+            const fInp = document.getElementById('lib-local-filter');
+            if (fInp) fInp.placeholder = t('filterPlaceholder');
+            const upd = document.getElementById('update-badge');
+            if (upd && !upd.innerText.includes('⏳') && !upd.innerText.includes('✓')) upd.innerText = t('autoUpdateActive');
+            const quitBtn = document.getElementById('quit-podmedia-btn');
+            if (quitBtn) quitBtn.innerText = t('quitBtn');
+
+            if (lastStatusData) updateUI(lastStatusData);
+            if (lastHubSummary) renderHubSummary(lastHubSummary);
+        }
+
+        function toggleLanguage() {
+            currentLang = currentLang === 'tr' ? 'en' : 'tr';
+            localStorage.setItem('podmedia_lang', currentLang);
+            applyLanguage();
+        }
+
+        /* =========================================================
+           STATUS POLLING (/api/status)
+           ========================================================= */
         async function fetchStatus() {
             try {
                 const res = await fetch('/api/status');
                 const data = await res.json();
+                lastStatusData = data;
                 updateUI(data);
-            } catch (err) {
-                console.error("Status check error:", err);
-            }
+            } catch (err) {}
         }
 
         function updateUI(data) {
             isSystemBusy = !!data.is_busy;
             const containers = data.containers || {};
             const groups = data.groups || {};
+            const isTraktReady = !!data.trakt_configured;
 
-            anyRunning = Object.values(containers).some(val => val === true);
+            const entries = Object.entries(containers);
+            anyRunning = entries.some(([, v]) => v === true);
+            const totalServices = entries.length || 10;
+            const runningCount = entries.filter(([, v]) => v === true).length;
 
-            // Service Counts & Active Summary Badge
-            const totalServices = Object.keys(containers).length || 8;
-            const runningCount = Object.values(containers).filter(v => v === true).length;
-            const allRunning = (runningCount === totalServices);
-            const allStopped = (runningCount === 0);
-
-            const activeCountText = document.getElementById('active-count');
-            const pulseDot = document.getElementById('pulse-dot');
-            if (activeCountText) {
-                activeCountText.innerText = `${runningCount} / ${totalServices} Active`;
-            }
-            if (pulseDot) {
-                pulseDot.style.backgroundColor = runningCount > 0 ? 'var(--accent-green)' : 'var(--accent-red)';
-                pulseDot.style.boxShadow = runningCount > 0 ? '0 0 10px var(--accent-green)' : 'none';
+            const tabCount = document.getElementById('tab-services-count');
+            if (tabCount) tabCount.innerText = `${runningCount}/${totalServices}`;
+            const ecoSvcBadge = document.getElementById('eco-services-badge');
+            if (ecoSvcBadge) {
+                ecoSvcBadge.innerText = `${runningCount} / ${totalServices}`;
+                ecoSvcBadge.className = 'badge ' + (runningCount > 0 ? 'on' : 'off');
             }
 
-            // Dual Master Buttons Logic
             const startAllBtn = document.getElementById('start-all-btn');
             const stopAllBtn = document.getElementById('stop-all-btn');
-
             if (isSystemBusy) {
-                if (startAllBtn) {
-                    startAllBtn.style.display = 'inline-flex';
-                    startAllBtn.className = 'btn-master busy';
-                    startAllBtn.innerHTML = '⏳ Processing...';
-                }
-                if (stopAllBtn) {
-                    stopAllBtn.style.display = 'none';
-                }
+                startAllBtn.style.display = 'inline-flex';
+                startAllBtn.className = 'btn btn-busy';
+                startAllBtn.innerHTML = `⏳ ${t('processing')}`;
+                stopAllBtn.style.display = 'none';
+            } else if (runningCount === 0) {
+                startAllBtn.style.display = 'inline-flex';
+                startAllBtn.className = 'btn btn-start';
+                startAllBtn.innerHTML = t('startAll');
+                stopAllBtn.style.display = 'none';
+            } else if (runningCount === totalServices) {
+                startAllBtn.style.display = 'none';
+                stopAllBtn.style.display = 'inline-flex';
+                stopAllBtn.className = 'btn btn-stop';
+                stopAllBtn.innerHTML = t('stopAll');
             } else {
-                if (allStopped) {
-                    if (startAllBtn) {
-                        startAllBtn.style.display = 'inline-flex';
-                        startAllBtn.className = 'btn-master start';
-                        startAllBtn.innerHTML = '▶️ Start All';
-                    }
-                    if (stopAllBtn) {
-                        stopAllBtn.style.display = 'none';
-                    }
-                } else if (allRunning) {
-                    if (startAllBtn) {
-                        startAllBtn.style.display = 'none';
-                    }
-                    if (stopAllBtn) {
-                        stopAllBtn.style.display = 'inline-flex';
-                        stopAllBtn.className = 'btn-master stop';
-                        stopAllBtn.innerHTML = '🛑 Stop All';
-                    }
-                } else {
-                    // Mixed state: Some running, some stopped! Show BOTH!
-                    if (startAllBtn) {
-                        startAllBtn.style.display = 'inline-flex';
-                        startAllBtn.className = 'btn-master start';
-                        startAllBtn.innerHTML = '▶️ Start All';
-                    }
-                    if (stopAllBtn) {
-                        stopAllBtn.style.display = 'inline-flex';
-                        stopAllBtn.className = 'btn-master stop';
-                        stopAllBtn.innerHTML = '🛑 Stop All';
-                    }
-                }
+                startAllBtn.style.display = 'inline-flex';
+                startAllBtn.className = 'btn btn-start';
+                startAllBtn.innerHTML = t('startAll');
+                stopAllBtn.style.display = 'inline-flex';
+                stopAllBtn.className = 'btn btn-stop';
+                stopAllBtn.innerHTML = t('stopAll');
             }
 
-            // Disable toggles if busy
-            document.querySelectorAll('input[type="checkbox"]').forEach(i => i.disabled = isSystemBusy);
+            document.querySelectorAll('.hub-card input[type="checkbox"], .service-row input[type="checkbox"]').forEach(i => i.disabled = isSystemBusy);
 
-            // Group Toggles & Badges
-            updateElement('group-plex', groups.plex);
-            updateElement('group-downloads', groups.downloads);
-            updateElement('group-music', groups.music);
+            updateModeCard('plex', groups.plex);
+            updateModeCard('downloads', groups.downloads);
+            updateModeCard('music', groups.music);
 
-            // App Toggles & Badges
-            updateElement('app-plex', containers.media_center_plex);
-            updateElement('app-radarr', containers.media_center_radarr);
-            updateElement('app-sonarr', containers.media_center_sonarr);
-            updateElement('app-qbittorrent', containers.media_center_qbittorrent);
-            updateElement('app-prowlarr', containers.media_center_prowlarr);
-            updateElement('app-flaresolverr', containers.media_center_flaresolverr);
-            updateElement('app-slskd', containers.media_center_slskd);
-            updateElement('app-beets', containers.media_center_beets);
-            updateElement('app-metube', containers.media_center_metube);
+            setLinkEnabled('quick-plex-link', containers.media_center_plex);
+            setLinkEnabled('quick-metube-link', containers.media_center_metube);
+            setLinkEnabled('lib-link-qbit', containers.media_center_qbittorrent);
+            setLinkEnabled('lib-link-radarr', containers.media_center_radarr);
+            setLinkEnabled('lib-link-sonarr', containers.media_center_sonarr);
+            setLinkEnabled('lib-link-slskd', containers.media_center_slskd);
+            setLinkEnabled('lib-link-metube', containers.media_center_metube);
 
-            // Update External Storage Banner
+            const musicTagBtn = document.getElementById('quick-music-tag-btn');
+            if (musicTagBtn) {
+                musicTagBtn.disabled = !containers.media_center_beets || isSystemBusy;
+            }
+            const beetsTagBtn = document.getElementById('beets-tag-btn');
+            if (beetsTagBtn) {
+                beetsTagBtn.disabled = !containers.media_center_beets || isSystemBusy;
+            }
+
+            updateGroupBadge('svc-group-plex-count', [containers.media_center_plex, containers.media_center_plextraktsync]);
+            updateGroupBadge('svc-group-downloads-count', [
+                containers.media_center_radarr,
+                containers.media_center_sonarr,
+                containers.media_center_qbittorrent,
+                containers.media_center_prowlarr,
+                containers.media_center_flaresolverr
+            ]);
+            updateGroupBadge('svc-group-music-count', [
+                containers.media_center_slskd,
+                containers.media_center_metube,
+                containers.media_center_beets
+            ]);
+
+            updateServiceRow('plex', containers.media_center_plex);
+            updateServiceRow('plextraktsync', containers.media_center_plextraktsync, isTraktReady ? null : t('traktNotConfigured'));
+            updateServiceRow('radarr', containers.media_center_radarr);
+            updateServiceRow('sonarr', containers.media_center_sonarr);
+            updateServiceRow('qbittorrent', containers.media_center_qbittorrent);
+            updateServiceRow('prowlarr', containers.media_center_prowlarr);
+            updateServiceRow('flaresolverr', containers.media_center_flaresolverr);
+            updateServiceRow('slskd', containers.media_center_slskd);
+            updateServiceRow('metube', containers.media_center_metube);
+            updateServiceRow('beets', containers.media_center_beets);
+
+            const traktBtn = document.getElementById('trakt-sync-btn');
+            const intTraktBtn = document.getElementById('int-trakt-sync-btn');
+            const traktToggle = document.getElementById('app-plextraktsync-toggle');
+            if (traktBtn && !traktBtn.dataset.busy) traktBtn.disabled = !isTraktReady;
+            if (intTraktBtn && !intTraktBtn.dataset.busy) intTraktBtn.disabled = !isTraktReady;
+            if (traktToggle && !isTraktReady) traktToggle.disabled = true;
+
             updateStorageBanner(data.external_disk, data.transfer);
         }
 
-        function updateElement(idPrefix, isActive) {
-            const toggle = document.getElementById(`${idPrefix}-toggle`);
-            const badge = document.getElementById(`${idPrefix}-badge`);
-            const text = document.getElementById(`${idPrefix}-text`);
+        function updateModeCard(mode, isActive) {
+            const card = document.getElementById(`mode-card-${mode}`);
+            const toggle = document.getElementById(`group-${mode}-toggle`);
+            const badge = document.getElementById(`group-${mode}-badge`);
+            const text = document.getElementById(`group-${mode}-text`);
 
             if (toggle) toggle.checked = !!isActive;
+            if (card) card.classList.toggle('is-active', !!isActive && !isSystemBusy);
             if (badge && text) {
                 if (isSystemBusy) {
-                    badge.className = 'status-badge busy';
-                    text.innerText = 'Processing...';
+                    badge.className = 'badge busy';
+                    text.innerText = t('processing');
                 } else if (isActive) {
-                    badge.className = 'status-badge on';
-                    text.innerText = 'Running';
+                    badge.className = 'badge on';
+                    text.innerText = t('running');
                 } else {
-                    badge.className = 'status-badge off';
-                    text.innerText = 'Stopped';
+                    badge.className = 'badge off';
+                    text.innerText = t('stopped');
                 }
             }
         }
 
-        function handleMasterAction() {
-            if (isSystemBusy) return;
-            if (anyRunning) {
-                triggerAction('stop-all', '');
+        function updateGroupBadge(elId, states) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const on = states.filter(Boolean).length;
+            el.innerText = `${on} / ${states.length}`;
+            el.className = 'badge ' + (on > 0 ? 'on' : 'off');
+        }
+
+        function updateServiceRow(appKey, isActive, customSub) {
+            const toggle = document.getElementById(`app-${appKey}-toggle`);
+            const dot = document.getElementById(`dot-app-${appKey}`);
+            const sub = document.getElementById(`sub-app-${appKey}`);
+            if (toggle) toggle.checked = !!isActive;
+            if (dot) dot.className = 'svc-dot' + (isSystemBusy ? ' busy' : (isActive ? ' on' : ''));
+            if (sub) sub.innerText = customSub ? customSub : (isSystemBusy ? t('processing') : (isActive ? t('running') : t('stopped')));
+            setLinkEnabled(`link-app-${appKey}`, isActive);
+        }
+
+        function setLinkEnabled(elId, isActive) {
+            const link = document.getElementById(elId);
+            if (!link) return;
+            if (isActive && !isSystemBusy) {
+                link.classList.remove('disabled-link');
+                link.removeAttribute('aria-disabled');
             } else {
-                triggerAction('start-all', '');
+                link.classList.add('disabled-link');
+                link.setAttribute('aria-disabled', 'true');
             }
         }
 
+        /* =========================================================
+           UNIFIED HUB LIVE DATA (/api/hub/summary, search, add)
+           ========================================================= */
+        async function fetchHubSummary(force = false) {
+            try {
+                const res = await fetch(`/api/hub/summary${force ? '?force=1' : ''}`);
+                const data = await res.json();
+                if (!data.error) {
+                    lastHubSummary = data;
+                    renderHubSummary(data);
+                }
+            } catch (err) {}
+        }
+
+        function formatEta(secs) {
+            if (!secs || secs <= 0) return '';
+            const h = Math.floor(secs / 3600);
+            const m = Math.floor((secs % 3600) / 60);
+            if (h > 0) return `${h}h ${m}m`;
+            if (m > 0) return `${m}m`;
+            return `${secs}s`;
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function renderHubSummary(hub) {
+            const plex = (hub.integrations && hub.integrations.plex) || {};
+            const trakt = (hub.integrations && hub.integrations.trakt) || {};
+            const lib = hub.library || {};
+            const dl = hub.downloads || {};
+
+            // 1. Plex account info directly inside Cinema card (zero duplication)
+            const plexStat = document.getElementById('overview-plex-stat');
+            if (plexStat) {
+                if (plex.connected && plex.username) {
+                    plexStat.innerText = plex.server_name ? `${plex.username} • ${plex.server_name}` : plex.username;
+                } else {
+                    plexStat.innerText = '';
+                }
+            }
+
+            // 2. Trakt ecosystem row
+            const intTraktBadge = document.getElementById('int-trakt-badge');
+            const intTraktMeta = document.getElementById('int-trakt-meta');
+            if (intTraktBadge && intTraktMeta) {
+                if (trakt.connected) {
+                    intTraktBadge.className = 'badge ' + (trakt.online ? 'on' : 'info');
+                    intTraktBadge.innerText = trakt.online ? `${t('connected')} • ${t('running')}` : t('connected');
+                    intTraktMeta.innerHTML = t('traktMetaConnected')(escapeHtml(trakt.username), trakt.watchlist_count);
+                } else {
+                    intTraktBadge.className = 'badge off';
+                    intTraktBadge.innerText = t('notConnected');
+                    intTraktMeta.innerText = t('traktMetaOff');
+                }
+            }
+
+            // 3. Overview library & subtle live download summary (zero layout shift!)
+            const libStat = document.getElementById('overview-lib-stat');
+            if (libStat) {
+                libStat.innerText = (lib.radarr_online || lib.sonarr_online)
+                    ? t('libStatSummary')(lib.movies_total || 0, lib.shows_total || 0)
+                    : '';
+            }
+
+            const tabDlBadge = document.getElementById('tab-dl-badge');
+            const ovDlPill = document.getElementById('overview-dl-pill');
+            const activeItems = (dl.items || []).filter(i => i.is_active);
+            const totalSpeed = Math.round(activeItems.reduce((acc, i) => acc + (i.speed_mbps || 0), 0) * 10) / 10;
+
+            if (tabDlBadge) {
+                if (dl.active_count > 0) {
+                    tabDlBadge.style.display = 'inline-block';
+                    tabDlBadge.className = 'tab-badge live';
+                    tabDlBadge.innerText = `${dl.active_count} ↓`;
+                } else {
+                    tabDlBadge.style.display = 'none';
+                }
+            }
+            if (ovDlPill) {
+                ovDlPill.innerText = dl.active_count > 0 ? t('activeDlPill')(dl.active_count, totalSpeed) : '';
+            }
+
+            // 4. Library view download queue
+            const libDlBadge = document.getElementById('lib-dl-badge');
+            const libDlList = document.getElementById('lib-dl-list');
+            if (libDlBadge) {
+                libDlBadge.innerText = dl.online ? `${dl.active_count} / ${dl.total_count}` : t('stopped');
+                libDlBadge.className = 'badge ' + (dl.active_count > 0 ? 'info' : (dl.online ? 'on' : 'off'));
+            }
+            if (libDlList) {
+                if (!dl.online) {
+                    libDlList.innerHTML = `<div class="empty-state"><span>${t('downloadsOffline')}</span><button class="btn btn-primary" onclick="triggerAction('start-group', 'downloads')">${t('startDownloadsNow')}</button></div>`;
+                } else if (!dl.items || dl.items.length === 0) {
+                    libDlList.innerHTML = `<div class="empty-state">${t('noActiveDownloads')}</div>`;
+                } else {
+                    libDlList.innerHTML = dl.items.map(renderDownloadRow).join('');
+                }
+            }
+
+            // 5. Library chips & list
+            const allItems = lib.items || [];
+            const moviesCnt = allItems.filter(x => x.type === 'movie').length;
+            const showsCnt = allItems.filter(x => x.type === 'show').length;
+            const missingCnt = allItems.filter(x => !x.has_file).length;
+            const cAll = document.getElementById('chip-all');
+            const cMov = document.getElementById('chip-movie');
+            const cSho = document.getElementById('chip-show');
+            const cMis = document.getElementById('chip-missing');
+            if (cAll) cAll.innerText = `${t('chipAll')} (${allItems.length})`;
+            if (cMov) cMov.innerText = `${t('chipMovies')} (${moviesCnt})`;
+            if (cSho) cSho.innerText = `${t('chipShows')} (${showsCnt})`;
+            if (cMis) cMis.innerText = `${t('chipMissing')} (${missingCnt})`;
+
+            renderLibraryList();
+        }
+
+        function renderDownloadRow(item) {
+            const done = item.progress >= 100;
+            const etaStr = formatEta(item.eta);
+            const speedStr = item.speed_mbps > 0 ? `${item.speed_mbps} MB/s` : item.state;
+            return `
+                <div class="dl-row">
+                    <div class="dl-top">
+                        <div class="dl-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+                        <div class="dl-meta">${item.progress}% • ${speedStr}${etaStr ? ` • ${etaStr}` : ''} • ${item.size_gb} GB</div>
+                    </div>
+                    <div class="mini-bar"><div class="mini-bar-fill ${done ? 'done' : ''}" style="width: ${item.progress}%;"></div></div>
+                </div>
+            `;
+        }
+
+        function setLibraryFilter(f) {
+            libraryFilter = f;
+            document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+            const active = document.getElementById(`chip-${f}`);
+            if (active) active.classList.add('active');
+            renderLibraryList();
+        }
+
+        function renderLibraryList() {
+            const el = document.getElementById('lib-items-list');
+            if (!el || !lastHubSummary) return;
+            const lib = lastHubSummary.library || {};
+            if (!lib.radarr_online && !lib.sonarr_online) {
+                el.innerHTML = `<div class="empty-state"><span>${t('downloadsOffline')}</span><button class="btn btn-primary" onclick="triggerAction('start-group', 'downloads')">${t('startDownloadsNow')}</button></div>`;
+                return;
+            }
+            const q = (document.getElementById('lib-local-filter')?.value || '').trim().toLowerCase();
+            let items = (lib.items || []).filter(item => {
+                if (libraryFilter === 'movie' && item.type !== 'movie') return false;
+                if (libraryFilter === 'show' && item.type !== 'show') return false;
+                if (libraryFilter === 'missing' && item.has_file) return false;
+                if (q && !(item.title || '').toLowerCase().includes(q)) return false;
+                return true;
+            });
+
+            if (items.length === 0) {
+                el.innerHTML = `<div class="empty-state">—</div>`;
+                return;
+            }
+
+            el.innerHTML = items.map(item => {
+                const typeLabel = item.type === 'movie' ? t('typeMovie') : t('typeShow');
+                const extra = item.type === 'show'
+                    ? `${item.episodes_have || 0}/${item.episodes_total || 0}`
+                    : (item.size_gb > 0 ? `${item.size_gb} GB` : '');
+                const badgeCls = item.has_file ? 'on' : 'busy';
+                const badgeTxt = item.has_file ? t('statusReady') : t('statusWanted');
+                const thumb = item.poster
+                    ? `<img class="lib-thumb" src="${escapeHtml(item.poster)}" loading="lazy" alt="">`
+                    : `<div class="lib-thumb" style="display:flex;align-items:center;justify-content:center;font-size:0.9rem;">${item.type === 'movie' ? '🎬' : '📺'}</div>`;
+                return `
+                    <div class="lib-row">
+                        <div class="lib-left">
+                            ${thumb}
+                            <div style="min-width:0;">
+                                <div class="lib-title">${escapeHtml(item.title)} ${item.year ? `(${item.year})` : ''}</div>
+                                <div class="lib-sub">${typeLabel}${extra ? ` • ${extra}` : ''}</div>
+                            </div>
+                        </div>
+                        <div class="lib-right">
+                            <span class="badge ${badgeCls}">${badgeTxt}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function searchNewMedia() {
+            const inp = document.getElementById('media-search-input');
+            const typeSel = document.getElementById('media-search-type');
+            const btn = document.getElementById('media-search-btn');
+            const area = document.getElementById('search-results-area');
+            const term = (inp?.value || '').trim();
+            if (!term) {
+                if (area) area.style.display = 'none';
+                return;
+            }
+            if (btn) { btn.disabled = true; btn.innerText = t('searchingBtn'); }
+            try {
+                const res = await fetch(`/api/hub/search?q=${encodeURIComponent(term)}&type=${encodeURIComponent(typeSel.value)}`);
+                const data = await res.json();
+                area.style.display = 'block';
+                if (!data.radarr_online && !data.sonarr_online) {
+                    area.innerHTML = `<div class="empty-state" style="padding:14px 0 4px;"><span>${t('downloadsOffline')}</span><button class="btn btn-sm btn-primary" onclick="triggerAction('start-group', 'downloads')">${t('startDownloadsNow')}</button></div>`;
+                    return;
+                }
+                const results = data.results || [];
+                if (!results.length) {
+                    area.innerHTML = `<div class="empty-state" style="padding:14px 0 4px;">—</div>`;
+                    return;
+                }
+                area.innerHTML = `<div class="search-results">${results.map(r => {
+                    const poster = r.poster
+                        ? `<img class="result-poster" src="${escapeHtml(r.poster)}" loading="lazy" alt="">`
+                        : `<div class="result-poster">${r.type === 'movie' ? '🎬' : '📺'}</div>`;
+                    const typeLbl = r.type === 'movie' ? t('typeMovie') : t('typeShow');
+                    const actionHtml = r.already_added
+                        ? `<span class="badge on">${t('addedBadge')}</span>`
+                        : `<button class="btn btn-sm btn-primary" onclick="addNewMedia('${r.type}', ${r.id}, this)">${t('addDownloadBtn')}</button>`;
+                    return `
+                        <div class="result-card">
+                            ${poster}
+                            <div class="result-info">
+                                <div class="result-title">${escapeHtml(r.title)} ${r.year ? `(${r.year})` : ''}</div>
+                                <div class="lib-sub">${typeLbl}</div>
+                                <div class="result-overview">${escapeHtml(r.overview)}</div>
+                                <div style="margin-top:4px;">${actionHtml}</div>
+                            </div>
+                        </div>
+                    `;
+                }).join('')}</div>`;
+            } catch (e) {
+                area.style.display = 'block';
+                area.innerHTML = `<div class="empty-state">Error</div>`;
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = t('searchAddBtn'); }
+            }
+        }
+
+        async function addNewMedia(mediaType, id, btnEl) {
+            if (btnEl) { btnEl.disabled = true; btnEl.innerText = '⏳'; }
+            try {
+                const res = await fetch(`/api/hub/add?type=${encodeURIComponent(mediaType)}&id=${encodeURIComponent(id)}`);
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    if (btnEl) { btnEl.className = 'badge on'; btnEl.innerText = t('addedBadge'); }
+                    fetchHubSummary(true);
+                } else {
+                    alert(data.message || 'Error');
+                    if (btnEl) { btnEl.disabled = false; btnEl.innerText = t('addDownloadBtn'); }
+                }
+            } catch (e) {
+                if (btnEl) { btnEl.disabled = false; btnEl.innerText = t('addDownloadBtn'); }
+            }
+        }
+
+        /* =========================================================
+           PODMAN ACTIONS, STORAGE, DISK POWER & TRAKT SYNC
+           ========================================================= */
         function triggerAction(action, target) {
             if (isSystemBusy) return;
-
-            // Open Progress Modal
             const modal = document.getElementById('modal-overlay');
             const terminal = document.getElementById('terminal-out');
             const progressFill = document.getElementById('progress-fill');
             const title = document.getElementById('modal-title');
 
-            title.innerText = '⚙️ Executing Podman Action...';
-            terminal.innerText = 'Establishing SSE connection...\n';
+            title.innerText = `⚙️ ${t('processing')}`;
+            terminal.innerText = 'Connecting...\n';
             progressFill.style.width = '15%';
-            progressFill.style.backgroundColor = '#38bdf8';
+            progressFill.style.backgroundColor = 'var(--accent)';
             modal.style.display = 'flex';
 
-            if (eventSource) {
-                eventSource.close();
-            }
-
+            if (eventSource) eventSource.close();
             eventSource = new EventSource(`/api/stream?action=${action}&target=${target}`);
             let stepCount = 0;
 
             eventSource.onmessage = function(event) {
-                const data = event.data;
-
-                if (data === '[DONE]') {
+                if (event.data === '[DONE]') {
                     eventSource.close();
                     progressFill.style.width = '100%';
-                    progressFill.style.backgroundColor = '#22c55e';
-                    title.innerText = '✓ Action Completed!';
+                    progressFill.style.backgroundColor = 'var(--green)';
+                    title.innerText = '✓ OK';
                     terminal.scrollTop = terminal.scrollHeight;
-                    
                     setTimeout(() => {
                         modal.style.display = 'none';
                         fetchStatus();
-                    }, 1200);
+                        fetchHubSummary(true);
+                    }, 900);
                     return;
                 }
-
                 stepCount++;
-                let currentPercent = Math.min(15 + (stepCount * 12), 90);
-                progressFill.style.width = `${currentPercent}%`;
-
-                terminal.innerText += data + '\n';
+                progressFill.style.width = `${Math.min(15 + (stepCount * 12), 90)}%`;
+                terminal.innerText += event.data + '\n';
                 terminal.scrollTop = terminal.scrollHeight;
             };
 
-            eventSource.onerror = function(err) {
-                console.error("SSE Streaming error:", err);
+            eventSource.onerror = function() {
                 eventSource.close();
-                setTimeout(() => {
-                    modal.style.display = 'none';
-                    fetchStatus();
-                }, 1500);
+                setTimeout(() => { modal.style.display = 'none'; fetchStatus(); fetchHubSummary(true); }, 1200);
             };
         }
 
         function quitPodMedia() {
-            if (!confirm("PodMedia'yı ve tüm çalışan servisleri durdurup harici diski serbest bırakmak istiyor musunuz?")) {
-                return;
-            }
-
+            if (!confirm(t('quitConfirm'))) return;
             const modal = document.getElementById('modal-overlay');
             const terminal = document.getElementById('terminal-out');
             const progressFill = document.getElementById('progress-fill');
             const title = document.getElementById('modal-title');
 
-            title.innerText = '⏻ PodMedia Kapatılıyor...';
-            terminal.innerText = 'Kapatma işlemi başlatıldı, servisler durduruluyor...\n';
+            title.innerText = `⏻ ${t('processing')}`;
+            terminal.innerText = '...\n';
             progressFill.style.width = '15%';
-            progressFill.style.backgroundColor = '#f43f5e';
+            progressFill.style.backgroundColor = 'var(--red)';
             modal.style.display = 'flex';
 
-            if (eventSource) {
-                eventSource.close();
-            }
-
+            if (eventSource) eventSource.close();
             eventSource = new EventSource('/api/stream?action=quit-all&target=');
             let stepCount = 0;
 
             const finalizeShutdown = async () => {
-                if (window.statusPollTimer) {
-                    clearInterval(window.statusPollTimer);
-                }
-                terminal.innerText += '[+] PodMedia web sunucusu kapatılıyor...\n';
-                terminal.innerText += '[✓] PODMEDIA KAPATILDI — Harici diskinizi güvenle çıkarabilirsiniz.\n';
+                if (window.statusPollTimer) clearInterval(window.statusPollTimer);
+                if (window.hubPollTimer) clearInterval(window.hubPollTimer);
+                terminal.innerText += '[✓] PodMedia stopped.\n';
                 terminal.scrollTop = terminal.scrollHeight;
                 progressFill.style.width = '100%';
-                progressFill.style.backgroundColor = '#22c55e';
-                title.innerText = '🛑 PodMedia Kapatıldı (Harici Disk Serbest)';
-
-                try {
-                    await fetch('/api/system/quit');
-                } catch (e) {
-                    // Expected if server exits immediately
-                }
+                progressFill.style.backgroundColor = 'var(--green)';
+                title.innerText = '🛑 PodMedia';
+                try { await fetch('/api/system/quit'); } catch (e) {}
             };
 
             eventSource.onmessage = function(event) {
-                const data = event.data;
-
-                if (data === '[DONE]') {
-                    eventSource.close();
-                    finalizeShutdown();
-                    return;
-                }
-
+                if (event.data === '[DONE]') { eventSource.close(); finalizeShutdown(); return; }
                 stepCount++;
-                let currentPercent = Math.min(15 + (stepCount * 8), 92);
-                progressFill.style.width = `${currentPercent}%`;
-
-                terminal.innerText += data + '\n';
+                progressFill.style.width = `${Math.min(15 + (stepCount * 8), 92)}%`;
+                terminal.innerText += event.data + '\n';
                 terminal.scrollTop = terminal.scrollHeight;
             };
-
-            eventSource.onerror = function(err) {
-                console.error("SSE Quit Streaming error:", err);
-                eventSource.close();
-                finalizeShutdown();
-            };
+            eventSource.onerror = function() { eventSource.close(); finalizeShutdown(); };
         }
 
-        /* EXTERNAL STORAGE & HYBRID TRANSFER LOGIC */
         let transferPollTimer = null;
         let isTransferring = false;
 
+        function handleOverviewTransferClick() {
+            if (isTransferring) {
+                openTransferModal();
+            } else {
+                startTransfer();
+            }
+        }
+
         function updateStorageBanner(disk, transfer) {
             if (!disk) return;
-
             const title = document.getElementById('disk-status-title');
             const badge = document.getElementById('disk-badge');
             const meta = document.getElementById('storage-meta');
-            const btn = document.getElementById('transfer-btn');
+            const transferBtns = [document.getElementById('transfer-btn'), document.getElementById('admin-transfer-btn')].filter(Boolean);
+            const sleepBtns = [document.getElementById('admin-sleep-btn')].filter(Boolean);
+            const wakeBtns = [document.getElementById('admin-wake-btn')].filter(Boolean);
+            const hero = document.getElementById('storage-hero');
+            const capWrap = document.getElementById('disk-capacity-wrap');
+            const capFill = document.getElementById('disk-capacity-fill');
+            const capSummary = document.getElementById('disk-cap-summary');
             const floating = document.getElementById('transfer-floating');
 
             if (title) {
-                if (disk.connected && disk.label) {
-                    title.innerText = `${disk.label} (${disk.drive_letter})`;
-                } else if (disk.label) {
-                    title.innerText = `${disk.label} (Takılı Değil)`;
-                } else {
-                    title.innerText = 'Harici Arşiv Diski';
-                }
+                if (disk.connected && disk.label) title.innerText = `${disk.label} (${disk.drive_letter})`;
+                else if (disk.label) title.innerText = `${disk.label}`;
+                else title.innerText = t('diskFallback');
             }
+            if (hero) hero.classList.toggle('is-connected', !!disk.connected);
 
             if (disk.connected) {
-                badge.className = 'disk-badge connected';
-                badge.innerText = `Bağlı (${disk.free_gb} GB Boş)`;
+                badge.className = 'badge on';
+                badge.innerText = t('diskConnectedOnly');
+
+                if (capWrap && disk.total_gb > 0) {
+                    const usedGb = Math.max(0, +(disk.total_gb - disk.free_gb).toFixed(1));
+                    const pct = Math.min(100, Math.round((usedGb / disk.total_gb) * 100));
+                    capWrap.style.display = 'block';
+                    if (capSummary) capSummary.innerHTML = t('diskCapLine')(usedGb, disk.total_gb, pct, disk.free_gb);
+                    if (capFill) {
+                        capFill.style.width = `${pct}%`;
+                        capFill.classList.toggle('warn', pct >= 85);
+                    }
+                } else if (capSummary) {
+                    capSummary.innerText = '';
+                }
+
+                sleepBtns.forEach(b => {
+                    b.style.display = 'inline-flex';
+                    if (!b.dataset.busy) {
+                        b.disabled = isSystemBusy || (transfer && transfer.active);
+                        b.title = anyRunning ? t('diskSleepNeedStop') : t('diskSleepBtn');
+                    }
+                });
+                wakeBtns.forEach(b => b.style.display = 'none');
 
                 if (transfer && transfer.active) {
-                    meta.innerHTML = `Aktarım devam ediyor: <b>${transfer.overall_percent}%</b> (${transfer.speed_mbps} MB/s)`;
-                    btn.disabled = true;
-                    btn.innerHTML = `⏳ Aktarım Sürüyor...`;
+                    meta.innerHTML = t('transferringMeta')(transfer.overall_percent, transfer.speed_mbps);
+                    transferBtns.forEach(b => {
+                        b.style.display = 'inline-flex';
+                        b.disabled = false;
+                        b.innerText = t('transferViewBtn');
+                    });
                 } else if (disk.total_pending_gb > 0) {
-                    meta.innerHTML = `Yerelde aktarılmayı bekleyen: <b>${disk.total_pending_gb} GB</b> (Film: ${disk.pending_movies_gb} GB, Dizi: ${disk.pending_series_gb} GB)`;
-                    btn.disabled = false;
-                    btn.innerHTML = `📦 Harici Diske Aktar ve Yer Aç (${disk.total_pending_gb} GB)`;
+                    meta.innerHTML = t('pendingMeta')(disk.total_pending_gb, disk.pending_movies_gb, disk.pending_series_gb);
+                    transferBtns.forEach(b => {
+                        b.style.display = 'inline-flex';
+                        b.disabled = false;
+                        b.innerText = t('transferBtn')(disk.total_pending_gb);
+                    });
                 } else {
-                    meta.innerHTML = `Yerel disk tertemiz! Tüm film ve diziler harici diskte arşivlenmiş durumda.`;
-                    btn.disabled = true;
-                    btn.innerHTML = `✓ Tüm İçerikler Haricide`;
+                    meta.innerText = t('allExternalMeta');
+                    transferBtns.forEach(b => { b.style.display = 'none'; });
                 }
             } else {
-                badge.className = 'disk-badge disconnected';
-                badge.innerText = `Takılı Değil`;
-                meta.innerHTML = `Yerelde ${disk.total_pending_gb} GB film/dizi var. Harici disk takıldığında tek tıkla aktarabilirsiniz.`;
-                btn.disabled = true;
-                btn.innerHTML = `💾 Harici Disk Takılı Değil`;
+                badge.className = 'badge err';
+                badge.innerText = t('diskNotAttached');
+                if (capWrap) capWrap.style.display = 'none';
+                if (capSummary) capSummary.innerText = '';
+                sleepBtns.forEach(b => b.style.display = 'none');
+                wakeBtns.forEach(b => {
+                    b.style.display = 'inline-flex';
+                    if (!b.dataset.busy) {
+                        b.disabled = isSystemBusy;
+                        b.title = t('diskWakeBtn');
+                    }
+                });
+                meta.innerHTML = t('disconnectedMeta')(disk.total_pending_gb);
+                transferBtns.forEach(b => { b.style.display = 'none'; });
             }
 
-            // Sync floating mini bar if active
             if (transfer && transfer.active) {
                 isTransferring = true;
                 floating.style.display = 'flex';
                 document.getElementById('float-percent').innerText = `${transfer.overall_percent}%`;
-                document.getElementById('float-file').innerText = transfer.current_file || 'Dosya hazırlanıyor';
+                document.getElementById('float-file').innerText = transfer.current_file || '...';
                 document.getElementById('float-speed').innerText = `${transfer.speed_mbps} MB/s`;
+                if (!transferPollTimer) transferPollTimer = setInterval(pollTransferStatus, 800);
+            } else if (isTransferring) {
+                isTransferring = false;
+                setTimeout(() => { floating.style.display = 'none'; }, 2000);
+            }
+        }
 
-                if (!transferPollTimer) {
-                    transferPollTimer = setInterval(pollTransferStatus, 800);
-                }
-            } else if (!transfer || !transfer.active) {
-                if (isTransferring) {
-                    isTransferring = false;
-                    setTimeout(() => {
-                        floating.style.display = 'none';
-                    }, 2000);
-                }
+        async function sleepExternalDisk() {
+            if (anyRunning) { alert(t('diskSleepNeedStop')); return; }
+            const btns = [document.getElementById('disk-sleep-btn'), document.getElementById('admin-sleep-btn')].filter(Boolean);
+            btns.forEach(b => { b.dataset.busy = '1'; b.disabled = true; });
+            try {
+                const res = await fetch('/api/disks/sleep');
+                const data = await res.json();
+                if (data.status !== 'ok') alert(data.message || t('diskSleepNeedStop'));
+                await fetchStatus();
+            } finally {
+                btns.forEach(b => { delete b.dataset.busy; b.disabled = false; });
+            }
+        }
+
+        async function wakeExternalDisk() {
+            const btns = [document.getElementById('disk-wake-btn'), document.getElementById('admin-wake-btn')].filter(Boolean);
+            btns.forEach(b => { b.dataset.busy = '1'; b.disabled = true; });
+            try {
+                await fetch('/api/disks/wake');
+                await fetchStatus();
+            } finally {
+                btns.forEach(b => { delete b.dataset.busy; b.disabled = false; });
+            }
+        }
+
+        async function syncTraktWatchlistNow() {
+            const btnSvc = document.getElementById('trakt-sync-btn');
+            const btnInt = document.getElementById('int-trakt-sync-btn');
+            if (btnSvc) { btnSvc.dataset.busy = '1'; btnSvc.disabled = true; btnSvc.innerText = '⏳'; }
+            if (btnInt) { btnInt.dataset.busy = '1'; btnInt.disabled = true; btnInt.innerText = t('syncingLong'); }
+            try {
+                const res = await fetch('/api/trakt/sync');
+                const data = await res.json();
+                if (btnSvc) btnSvc.innerText = data.status === 'ok' ? '✓' : t('syncBtn');
+                if (btnInt) btnInt.innerText = data.status === 'ok' ? t('syncedLong') : t('syncWatchlist');
+                fetchHubSummary(true);
+            } catch (e) {
+                if (btnSvc) btnSvc.innerText = t('syncBtn');
+                if (btnInt) btnInt.innerText = t('syncWatchlist');
+            } finally {
+                setTimeout(() => {
+                    if (btnSvc) { delete btnSvc.dataset.busy; btnSvc.disabled = false; btnSvc.innerText = t('syncBtn'); }
+                    if (btnInt) { delete btnInt.dataset.busy; btnInt.disabled = false; btnInt.innerText = t('syncWatchlist'); }
+                }, 2500);
             }
         }
 
@@ -1393,175 +2818,107 @@
                 if (data.status === 'ok') {
                     openTransferModal();
                     pollTransferStatus();
-                    if (!transferPollTimer) {
-                        transferPollTimer = setInterval(pollTransferStatus, 800);
-                    }
+                    if (!transferPollTimer) transferPollTimer = setInterval(pollTransferStatus, 800);
                 } else {
-                    alert(data.message || 'Aktarım başlatılamadı.');
+                    alert(data.message || 'Transfer error.');
                 }
-            } catch (err) {
-                console.error("Transfer start error:", err);
-                alert("Aktarım başlatılırken sunucu hatası oluştu.");
-            }
+            } catch (err) { alert('Server error.'); }
         }
 
         async function stopTransfer(mode) {
-            const btnG = document.getElementById('btn-t-graceful');
-            const btnI = document.getElementById('btn-t-immediate');
-            const statusMsg = document.getElementById('t-status-msg');
-
-            btnG.disabled = true;
-            btnI.disabled = true;
-
-            if (mode === 'immediate') {
-                statusMsg.innerText = "🛑 Hemen durduruluyor... Yarım kalan dosya silinip kaynak korunacak.";
-            } else {
-                statusMsg.innerText = "⏸️ Kontrollü durduruluyor... Mevcut dosya tamamlandıktan sonra duracak.";
-            }
-
-            try {
-                const res = await fetch(`/api/transfer/stop?mode=${mode}`);
-                const data = await res.json();
-                pollTransferStatus();
-            } catch (err) {
-                console.error("Transfer stop error:", err);
-            }
+            document.getElementById('btn-t-graceful').disabled = true;
+            document.getElementById('btn-t-immediate').disabled = true;
+            try { await fetch(`/api/transfer/stop?mode=${mode}`); pollTransferStatus(); } catch (err) {}
         }
 
         async function pollTransferStatus() {
             try {
                 const res = await fetch('/api/transfer/status');
                 const data = await res.json();
-                const t = data.transfer;
-                const disk = data.disk;
+                const tr = data.transfer;
+                if (!tr) return;
 
-                if (!t) return;
+                const doneGB = (tr.transferred_bytes / (1024**3)).toFixed(2);
+                const totalGB = (tr.total_bytes / (1024**3)).toFixed(2);
+                document.getElementById('t-overall-text').innerText = `${doneGB} GB / ${totalGB} GB (${tr.overall_percent}%)`;
+                document.getElementById('t-overall-fill').style.width = `${tr.overall_percent}%`;
 
-                // Overall progress
-                const doneGB = (t.transferred_bytes / (1024**3)).toFixed(2);
-                const totalGB = (t.total_bytes / (1024**3)).toFixed(2);
-                document.getElementById('t-overall-text').innerText = `${doneGB} GB / ${totalGB} GB (%${t.overall_percent})`;
-                document.getElementById('t-overall-fill').style.width = `${t.overall_percent}%`;
+                const fileDoneMB = (tr.current_file_bytes / (1024**2)).toFixed(1);
+                const fileTotalMB = (tr.current_file_total / (1024**2)).toFixed(1);
+                document.getElementById('t-current-filename').innerText = tr.current_file || '-';
+                document.getElementById('t-file-text').innerText = `${fileDoneMB} MB / ${fileTotalMB} MB (${tr.current_file_percent}%)`;
+                document.getElementById('t-file-fill').style.width = `${tr.current_file_percent}%`;
+                document.getElementById('t-speed').innerText = `${tr.speed_mbps} MB/s`;
 
-                // Current file progress
-                const fileDoneMB = (t.current_file_bytes / (1024**2)).toFixed(1);
-                const fileTotalMB = (t.current_file_total / (1024**2)).toFixed(1);
-                document.getElementById('t-current-filename').innerText = t.current_file || '-';
-                document.getElementById('t-file-text').innerText = `${fileDoneMB} MB / ${fileTotalMB} MB (%${t.current_file_percent})`;
-                document.getElementById('t-file-fill').style.width = `${t.current_file_percent}%`;
-
-                // Metrics
-                document.getElementById('t-speed').innerText = `${t.speed_mbps} MB/s`;
-                
-                if (t.eta_seconds > 0) {
-                    const mins = Math.floor(t.eta_seconds / 60);
-                    const secs = t.eta_seconds % 60;
-                    document.getElementById('t-eta').innerText = mins > 0 ? `~${mins} dk ${secs} sn` : `~${secs} sn`;
+                if (tr.eta_seconds > 0) {
+                    const mins = Math.floor(tr.eta_seconds / 60);
+                    const secs = tr.eta_seconds % 60;
+                    document.getElementById('t-eta').innerText = mins > 0 ? `~${mins}m ${secs}s` : `~${secs}s`;
                 } else {
-                    document.getElementById('t-eta').innerText = t.active ? 'Hesaplanıyor...' : '-';
+                    document.getElementById('t-eta').innerText = tr.active ? '...' : '-';
                 }
 
-                document.getElementById('t-files-count').innerText = `${t.transferred_files} / ${t.total_files}`;
-                document.getElementById('t-status-msg').innerText = t.message || '-';
+                document.getElementById('t-files-count').innerText = `${tr.transferred_files} / ${tr.total_files}`;
+                document.getElementById('t-status-msg').innerText = tr.message || '-';
 
-                // Floating mini bar updates
-                const floating = document.getElementById('transfer-floating');
-                if (t.active) {
-                    floating.style.display = 'flex';
-                    document.getElementById('float-percent').innerText = `${t.overall_percent}%`;
-                    document.getElementById('float-file').innerText = t.current_file || 'Aktarılıyor';
-                    document.getElementById('float-speed').innerText = `${t.speed_mbps} MB/s`;
-                }
-
-                // If finished or stopped
-                if (!t.active) {
+                if (!tr.active) {
                     document.getElementById('btn-t-graceful').disabled = true;
                     document.getElementById('btn-t-immediate').disabled = true;
-
-                    if (transferPollTimer) {
-                        clearInterval(transferPollTimer);
-                        transferPollTimer = null;
-                    }
-
-                    if (t.phase === 'completed') {
-                        document.getElementById('t-overall-fill').style.backgroundColor = 'var(--accent-green)';
-                    }
-
+                    if (transferPollTimer) { clearInterval(transferPollTimer); transferPollTimer = null; }
+                    if (tr.phase === 'completed') document.getElementById('t-overall-fill').style.backgroundColor = 'var(--green)';
                     fetchStatus();
                 } else {
                     document.getElementById('btn-t-graceful').disabled = false;
                     document.getElementById('btn-t-immediate').disabled = false;
                 }
-            } catch (err) {
-                console.error("Poll transfer error:", err);
-            }
+            } catch (err) {}
         }
 
-        function openTransferModal() {
-            document.getElementById('transfer-modal-overlay').style.display = 'flex';
-        }
+        function openTransferModal() { document.getElementById('transfer-modal-overlay').style.display = 'flex'; }
+        function closeTransferModal() { document.getElementById('transfer-modal-overlay').style.display = 'none'; }
 
-        function closeTransferModal() {
-            document.getElementById('transfer-modal-overlay').style.display = 'none';
-        }
-
-        /* DISK SELECTION MODAL LOGIC */
         async function openDiskSelectModal() {
             document.getElementById('disk-modal-overlay').style.display = 'flex';
             await loadDiskList();
         }
-
-        function closeDiskSelectModal() {
-            document.getElementById('disk-modal-overlay').style.display = 'none';
-        }
+        function closeDiskSelectModal() { document.getElementById('disk-modal-overlay').style.display = 'none'; }
 
         async function loadDiskList() {
             const listEl = document.getElementById('disk-list');
-            listEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Sürücüler taranıyor...</div>';
+            listEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">...</div>';
             try {
                 const res = await fetch('/api/disks/list');
                 const data = await res.json();
                 const drives = data.drives || [];
                 const active = data.active;
-                
-                if (drives.length === 0) {
-                    listEl.innerHTML = '<div style="text-align: center; color: var(--text-muted); padding: 20px;">Kullanılabilir sürücü bulunamadı.</div>';
-                    return;
-                }
-
+                if (!drives.length) { listEl.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">-</div>'; return; }
                 listEl.innerHTML = drives.map(d => {
                     const isSelected = (active && active.letter === d.letter) || d.is_selected;
-                    const driveTypeBadge = d.is_removable 
-                        ? '<span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">USB / Harici</span>' 
-                        : '<span style="font-size: 0.72rem; padding: 2px 6px; border-radius: 4px; background: rgba(148, 163, 184, 0.15); color: #94a3b8;">Sabit Sürücü</span>';
-                    
+                    const badge = d.is_removable ? '<span class="badge on">USB</span>' : '<span class="badge off">Local</span>';
                     return `
                         <div class="disk-item ${isSelected ? 'active' : ''}">
                             <div class="disk-item-info">
                                 <div class="disk-item-icon">${d.is_removable ? '🔌' : '💽'}</div>
                                 <div>
                                     <div class="disk-item-name">
-                                        <span>${d.label} (${d.letter})</span>
-                                        ${driveTypeBadge}
-                                        ${d.has_marker ? '<span style="font-size: 0.7rem; color: #10b981;" title="PodMedia arşivi olarak önceden kullanılmış">✓ PodMedia</span>' : ''}
+                                        <span>${escapeHtml(d.label)} (${escapeHtml(d.letter)})</span>
+                                        ${badge}
+                                        ${d.has_marker ? '<span class="badge on">✓ PodMedia</span>' : ''}
                                     </div>
-                                    <div class="disk-item-sub">
-                                        Boş Alan: <b>${d.free_gb} GB</b> / Toplam: ${d.total_gb} GB (${d.fs})
-                                    </div>
+                                    <div class="disk-item-sub"><b>${d.free_gb} GB</b> / ${d.total_gb} GB (${escapeHtml(d.fs)})</div>
                                 </div>
                             </div>
                             <div>
-                                ${isSelected 
-                                    ? '<button class="btn-select-action selected" disabled>✓ Aktif Disk</button>' 
-                                    : `<button class="btn-select-action" onclick="chooseDisk('${d.letter}')">Bu Diski Kullan</button>`
+                                ${isSelected
+                                    ? '<button class="btn-select-action selected" disabled>✓</button>'
+                                    : `<button class="btn-select-action" onclick="chooseDisk('${escapeHtml(d.letter)}')">✓</button>`
                                 }
                             </div>
                         </div>
                     `;
                 }).join('');
             } catch (err) {
-                console.error("Failed to load disks:", err);
-                listEl.innerHTML = '<div style="text-align: center; color: var(--accent-red); padding: 20px;">Sürücüler taranamadı.</div>';
+                listEl.innerHTML = '<div style="text-align:center;color:var(--red);padding:20px;">Error</div>';
             }
         }
 
@@ -1572,36 +2929,165 @@
                 if (data.status === 'ok') {
                     await loadDiskList();
                     await fetchStatus();
-                    setTimeout(closeDiskSelectModal, 600);
+                    setTimeout(closeDiskSelectModal, 500);
                 } else {
-                    alert(data.message || 'Disk seçilemedi.');
+                    alert(data.message || 'Error');
                 }
-            } catch (err) {
-                console.error("Choose disk error:", err);
-                alert("Disk seçilirken sunucu hatası oluştu.");
+            } catch (err) {}
+        }
+
+        function populateSettingsForm(s) {
+            if (!s || s.error) return;
+            document.getElementById('set-server-port').value = s.server_port ?? 3000;
+            document.getElementById('set-watched-action').value = s.watched_media_action ?? 'keep';
+            document.getElementById('set-sync-minutes').value = s.watchlist_sync_minutes ?? 5;
+            document.getElementById('set-dl-limit').value = s.dl_limit_mbps ?? 0;
+            document.getElementById('set-up-limit').value = s.up_limit_kbps ?? 0;
+            document.getElementById('set-dl-limit').disabled = !s.qbit_online;
+            document.getElementById('set-up-limit').disabled = !s.qbit_online;
+            document.getElementById('set-auto-rename').checked = s.auto_rename_media !== false;
+            document.getElementById('set-auto-rename').disabled = !s.arr_online;
+            document.getElementById('set-allowed-hosts').value = s.allowed_hosts ?? '';
+            document.getElementById('set-plex-ip').value = s.plex_advertise_ip ?? '';
+            document.getElementById('set-plex-host').value = s.plex_hostname ?? '';
+            document.getElementById('set-tz').value = s.timezone ?? 'Europe/Istanbul';
+            document.getElementById('set-auto-update').checked = !!s.auto_update_enabled;
+
+            const showTrakt = !!s.trakt_available;
+            document.getElementById('trakt-threshold-field').style.display = showTrakt ? 'flex' : 'none';
+            document.getElementById('trakt-ratings-field').style.display = showTrakt ? 'flex' : 'none';
+            document.getElementById('trakt-watched-field').style.display = showTrakt ? 'flex' : 'none';
+            if (showTrakt) {
+                document.getElementById('set-trakt-threshold').value = s.trakt_scrobble_threshold ?? 80;
+                document.getElementById('set-trakt-ratings').checked = !!s.trakt_sync_ratings;
+                document.getElementById('set-trakt-watched').checked = !!s.trakt_sync_watched;
             }
         }
 
+        async function loadSettings() {
+            try {
+                const res = await fetch('/api/settings');
+                const s = await res.json();
+                populateSettingsForm(s);
+            } catch (e) {}
+        }
+
+        async function applyPostSaveRestarts(targets) {
+            const list = Array.isArray(targets) ? targets : [];
+            const needWebRestart = list.includes('podmedia');
+            const containerTargets = list.filter(x => x !== 'podmedia').join(',');
+
+            const doWebRestart = async () => {
+                if (!confirm(t('podmediaRestartConfirm'))) return;
+                try {
+                    const res = await fetch('/api/system/restart', { method: 'POST' });
+                    const data = await res.json();
+                    const newPort = data.port || window.location.port || 3000;
+                    setTimeout(() => {
+                        window.location.href = `${window.location.protocol}//${window.location.hostname}:${newPort}`;
+                    }, 2200);
+                } catch (e) {}
+            };
+
+            if (containerTargets) {
+                triggerAction('restart-services', containerTargets);
+                if (needWebRestart) {
+                    setTimeout(doWebRestart, 3500);
+                }
+            } else if (needWebRestart) {
+                await doWebRestart();
+            }
+        }
+
+        async function saveSettings() {
+            const btn = document.getElementById('btn-save-settings');
+            const msg = document.getElementById('settings-save-msg');
+            if (btn) { btn.disabled = true; btn.innerText = t('savingBtn'); }
+            if (msg) msg.innerText = '';
+            try {
+                const payload = {
+                    server_port: parseInt(document.getElementById('set-server-port').value, 10) || 3000,
+                    watched_media_action: document.getElementById('set-watched-action').value,
+                    watchlist_sync_minutes: parseInt(document.getElementById('set-sync-minutes').value, 10) || 5,
+                    dl_limit_mbps: parseFloat(document.getElementById('set-dl-limit').value) || 0,
+                    up_limit_kbps: parseInt(document.getElementById('set-up-limit').value, 10) || 0,
+                    auto_rename_media: document.getElementById('set-auto-rename').checked,
+                    allowed_hosts: document.getElementById('set-allowed-hosts').value.trim(),
+                    plex_advertise_ip: document.getElementById('set-plex-ip').value.trim(),
+                    plex_hostname: document.getElementById('set-plex-host').value.trim(),
+                    timezone: document.getElementById('set-tz').value.trim(),
+                    auto_update_enabled: document.getElementById('set-auto-update').checked,
+                    trakt_scrobble_threshold: parseInt(document.getElementById('set-trakt-threshold').value, 10) || 80,
+                    trakt_sync_ratings: document.getElementById('set-trakt-ratings').checked,
+                    trakt_sync_watched: document.getElementById('set-trakt-watched').checked
+                };
+                const res = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    populateSettingsForm(data.settings);
+                    if (msg) {
+                        msg.style.color = 'var(--green)';
+                        msg.innerText = data.restart_needed ? t('settingsSavedRestarting') : t('settingsSaved');
+                    }
+                    if (data.restart_needed) {
+                        await applyPostSaveRestarts(data.restart_targets || []);
+                    }
+                } else {
+                    if (msg) { msg.style.color = 'var(--red)'; msg.innerText = data.message || 'Error'; }
+                }
+            } catch (e) {
+                if (msg) { msg.style.color = 'var(--red)'; msg.innerText = 'Error'; }
+            } finally {
+                if (btn) { btn.disabled = false; btn.innerText = t('saveSettingsBtn'); }
+            }
+        }
+
+        async function resetSettingsToDefaults() {
+            if (!confirm(t('resetConfirm'))) return;
+            const msg = document.getElementById('settings-save-msg');
+            try {
+                const res = await fetch('/api/settings/reset', { method: 'POST' });
+                const data = await res.json();
+                if (data.status === 'ok') {
+                    populateSettingsForm(data.settings);
+                    if (msg) {
+                        msg.style.color = 'var(--green)';
+                        msg.innerText = t('settingsResetDone');
+                    }
+                    if (data.restart_needed) {
+                        await applyPostSaveRestarts(data.restart_targets || []);
+                    }
+                }
+            } catch (e) {}
+        }
+
         async function checkUpdatesNow() {
-            const badge = document.getElementById('update-badge');
-            if (badge) badge.innerText = "⏳ Taranıyor...";
+            const btns = [document.getElementById('update-badge'), document.getElementById('overview-update-btn')].filter(Boolean);
+            btns.forEach(b => { b.disabled = true; b.innerText = t('autoUpdateScanning'); });
             try {
                 const res = await fetch('/api/updates/check');
                 const data = await res.json();
-                if (badge) {
-                    badge.innerText = (data.updated && data.updated.length > 0) 
-                        ? `✓ ${data.updated.length} Güncellendi!` 
-                        : "✓ İmajlar Güncel";
-                    setTimeout(() => { badge.innerText = "🔄 Auto-Update: Aktif"; }, 4000);
-                }
+                const msg = (data.updated && data.updated.length > 0) ? `✓ ${data.updated.length}` : t('autoUpdateUpToDate');
+                btns.forEach(b => { b.innerText = msg; });
             } catch (e) {
-                if (badge) badge.innerText = "🔄 Auto-Update: Aktif";
+                btns.forEach(b => { b.innerText = t('autoUpdateActive'); });
+            } finally {
+                setTimeout(() => {
+                    const b1 = document.getElementById('update-badge');
+                    const b2 = document.getElementById('overview-update-btn');
+                    if (b1) { b1.disabled = false; b1.innerText = t('autoUpdateActive'); }
+                    if (b2) { b2.disabled = false; b2.innerText = t('checkUpdatesShort'); }
+                }, 4000);
             }
         }
 
         function updateDynamicServiceLinks() {
             const currentHost = window.location.hostname || 'localhost';
-            document.querySelectorAll('.link-btn[data-port]').forEach(btn => {
+            document.querySelectorAll('[data-port]').forEach(btn => {
                 const port = btn.getAttribute('data-port');
                 const path = btn.getAttribute('data-path') || '';
                 const protocol = btn.getAttribute('data-protocol') || 'http';
@@ -1609,9 +3095,13 @@
             });
         }
 
+        applyTheme();
+        applyLanguage();
         updateDynamicServiceLinks();
         fetchStatus();
-        window.statusPollTimer = setInterval(fetchStatus, 2000);
+        fetchHubSummary(true);
+        window.statusPollTimer = setInterval(fetchStatus, 2500);
+        window.hubPollTimer = setInterval(() => fetchHubSummary(false), 6000);
     </script>
 </body>
 </html>

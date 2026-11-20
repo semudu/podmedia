@@ -100,7 +100,7 @@ def set_autostart(enable=True):
         if enable:
             content = f"""[Desktop Entry]
 Type=Application
-Name=PodMedia Hub
+Name=PodMedia
 Exec={cmd}
 Hidden=false
 NoDisplay=false

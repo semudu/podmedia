@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="PodMedia">
+  <defs>
+    <linearGradient id="pm-bg" x1="6" y1="4" x2="58" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#4338ca"/>
+      <stop offset="52%" stop-color="#5b50f0"/>
+      <stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <radialGradient id="pm-glow" cx="76%" cy="22%" r="56%">
+      <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.34"/>
+      <stop offset="100%" stop-color="#38bdf8" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="pm-pod-fill" x1="16" y1="14" x2="48" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.16"/>
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.15"/>
+    </linearGradient>
+    <linearGradient id="pm-pod-stroke" x1="14" y1="14" x2="50" y2="50" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.96"/>
+      <stop offset="55%" stop-color="#e0e7ff" stop-opacity="0.85"/>
+      <stop offset="100%" stop-color="#c4b5fd" stop-opacity="0.74"/>
+    </linearGradient>
+    <linearGradient id="pm-play" x1="27" y1="22" x2="42" y2="41" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#eef2ff"/>
+    </linearGradient>
+    <linearGradient id="pm-node" x1="45" y1="18" x2="52" y2="25" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#7dd3fc"/>
+      <stop offset="100%" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <filter id="pm-shadow" filterUnits="userSpaceOnUse" x="0" y="0" width="64" height="64">
+      <feDropShadow dx="0" dy="1.8" stdDeviation="2.0" flood-color="#1e1b4b" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+
+  <!-- Rounded App Tile -->
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#pm-bg)"/>
+  <rect x="2" y="2" width="60" height="60" rx="15" fill="url(#pm-glow)"/>
+  <rect x="2.75" y="2.75" width="58.5" height="58.5" rx="14.25" fill="none" stroke="#ffffff" stroke-opacity="0.16" stroke-width="1.5"/>
+
+  <!-- Translucent Hexagonal Pod Body -->
+  <path d="M 35.12 13.80 L 46.20 20.20 Q 49.32 22 49.32 25.60 L 49.32 38.40 Q 49.32 42 46.20 43.80 L 35.12 50.20 Q 32 52 28.88 50.20 L 17.80 43.80 Q 14.68 42 14.68 38.40 L 14.68 25.60 Q 14.68 22 17.80 20.20 L 28.88 13.80 Q 32 12 35.12 13.80 Z"
+        fill="url(#pm-pod-fill)"/>
+
+  <!-- Open-Vertex Geometric Pod Frame -->
+  <path d="M 49.32 28.4 L 49.32 38.40 Q 49.32 42 46.20 43.80 L 35.12 50.20 Q 32 52 28.88 50.20 L 17.80 43.80 Q 14.68 42 14.68 38.40 L 14.68 25.60 Q 14.68 22 17.80 20.20 L 28.88 13.80 Q 32 12 35.12 13.80 L 42.1 17.85"
+        fill="none" stroke="url(#pm-pod-stroke)" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Live Sync / Hub Node -->
+  <circle cx="48.5" cy="21.4" r="3.6" fill="url(#pm-node)" filter="url(#pm-shadow)"/>
+  <circle cx="47.6" cy="20.5" r="1.15" fill="#f0f9ff" fill-opacity="0.9"/>
+
+  <!-- Optically Centered Play Glyph -->
+  <path d="M 26.8 25.0 L 26.8 39.0 Q 26.8 41.6 29.05 40.3 L 41.1 33.3 Q 43.35 32 41.1 30.7 L 29.05 23.7 Q 26.8 22.4 26.8 25.0 Z"
+        fill="url(#pm-play)" filter="url(#pm-shadow)"/>
+</svg>

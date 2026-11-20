@@ -1,0 +1,36 @@
+# PlexTraktSync Configuration Template
+# Documentation: https://github.com/Taxel/PlexTraktSync
+#
+# First-time setup (run once in terminal while Plex is running):
+#   podman-compose -f services/tools/podman-compose.yml run --rm plextraktsync login
+
+cache:
+  path: /app/config/trakt_cache
+
+excluded-libraries: []
+
+sync:
+  rating_priority: plex
+  plex_to_trakt:
+    collection: false
+    clear_collected: false
+    ratings: true
+    watched_status: true
+    watchlist: false
+  trakt_to_plex:
+    liked_lists: false
+    ratings: true
+    watched_status: true
+    watchlist: false
+    watchlist_as_playlist: false
+
+watch:
+  add_collection: false
+  remove_collection: false
+  scrobble_threshold: 80
+  username_filter: true
+  media_progressbar: false
+
+xbmc-providers:
+  movies: imdb
+  shows: tvdb

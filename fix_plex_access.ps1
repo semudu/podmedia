@@ -2,13 +2,13 @@
 $ErrorActionPreference = "SilentlyContinue"
 
 Write-Host "==================================================" -ForegroundColor Cyan
-Write-Host "  PodMedia Hub - Fixing Local & Network Access" -ForegroundColor Cyan
+Write-Host "  PodMedia - Fixing Local & Network Access" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 
 # 1. Add Windows Firewall Rule
 Write-Host "[1/2] Setting Windows Firewall Rules..." -ForegroundColor Yellow
-New-NetFirewallRule -DisplayName "PodMedia Hub Services" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000,32400,7878,8989,8080,9696,8191,5030,8337 -ErrorAction SilentlyContinue | Out-Null
+New-NetFirewallRule -DisplayName "PodMedia Services" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000,32400,7878,8989,8080,8081,9696,8191,5030,8337 -ErrorAction SilentlyContinue | Out-Null
 Write-Host " [✓] Firewall rule configured!" -ForegroundColor Green
 
 # 2. Get Podman WSL2 VM IP & Set Netsh Portproxy

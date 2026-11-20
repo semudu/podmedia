@@ -109,6 +109,13 @@ def run_setup():
         "Radarr Movies Management (services/tools/radarr/config/config.xml)"
     )
 
+    # PlexTraktSync Config (Optional Plex <-> Trakt Sync)
+    copy_template_if_missing(
+        os.path.join(base_dir, "services", "tools", "plextraktsync", "config.yml.example"),
+        os.path.join(base_dir, "services", "tools", "plextraktsync", "config", "config.yml"),
+        "PlexTraktSync (services/tools/plextraktsync/config/config.yml)"
+    )
+
     # 3. Dynamic Directory Creation Based on config.properties
     print("\n[3/5] Creating Dynamic Directory & Pipeline Structure...")
     print(f" [i] Active Media Directory    : {media_dir}")
@@ -127,6 +134,8 @@ def run_setup():
         os.path.join(base_dir, "services", "tools", "qbittorrent", "config", "qBittorrent"),
         os.path.join(base_dir, "services", "tools", "sonarr", "config"),
         os.path.join(base_dir, "services", "tools", "radarr", "config"),
+        os.path.join(base_dir, "services", "tools", "prowlarr", "config"),
+        os.path.join(base_dir, "services", "tools", "plextraktsync", "config"),
     ]
 
     for d in directories:

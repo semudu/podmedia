@@ -1,0 +1,415 @@
+import os
+import re
+import json
+import socket
+import configparser
+import subprocess
+import urllib.request
+import urllib.parse
+import xml.etree.ElementTree as ET
+import podman_manager
+import radarr_sonarr_sync
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+CONFIG_PROPERTIES_PATH = os.path.join(PROJECT_ROOT, "config.properties")
+PLEX_ENV_PATH = os.path.join(PROJECT_ROOT, "services", "plex", ".env")
+TRAKT_YML_PATH = os.path.join(PROJECT_ROOT, "services", "tools", "plextraktsync", "config", "config.yml")
+ARR_CONFIGS = [
+    ("radarr", os.path.join(PROJECT_ROOT, "services", "tools", "radarr", "config", "config.xml")),
+    ("sonarr", os.path.join(PROJECT_ROOT, "services", "tools", "sonarr", "config", "config.xml")),
+    ("prowlarr", os.path.join(PROJECT_ROOT, "services", "tools", "prowlarr", "config", "config.xml")),
+]
+
+
+def _detect_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
+
+def _read_env_file(path):
+    data = {}
+    if not os.path.exists(path):
+        return data
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#") or "=" not in s:
+                    continue
+                k, v = s.split("=", 1)
+                data[k.strip()] = v.strip()
+    except Exception:
+        pass
+    return data
+
+
+def _write_env_file(path, updates):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    lines = []
+    if os.path.exists(path):
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+    written = set()
+    new_lines = []
+    for line in lines:
+        s = line.strip()
+        if s and not s.startswith("#") and "=" in s:
+            k = s.split("=", 1)[0].strip()
+            if k in updates:
+                new_lines.append(f"{k}={updates[k]}")
+                written.add(k)
+                continue
+        new_lines.append(line)
+    for k, v in updates.items():
+        if k not in written:
+            new_lines.append(f"{k}={v}")
+    with open(path, "w", encoding="utf-8") as f:
+        f.write("\n".join(new_lines) + "\n")
+
+
+def _read_trakt_yml():
+    res = {"available": os.path.exists(TRAKT_YML_PATH), "sync_ratings": True, "sync_watched": True, "scrobble_threshold": 80}
+    if not res["available"]:
+        return res
+    try:
+        with open(TRAKT_YML_PATH, "r", encoding="utf-8") as f:
+            text = f.read()
+        m_rat = re.search(r"^\s*ratings:\s*(true|false)", text, re.MULTILINE | re.IGNORECASE)
+        if m_rat:
+            res["sync_ratings"] = m_rat.group(1).lower() == "true"
+        m_wat = re.search(r"^\s*watched_status:\s*(true|false)", text, re.MULTILINE | re.IGNORECASE)
+        if m_wat:
+            res["sync_watched"] = m_wat.group(1).lower() == "true"
+        m_thr = re.search(r"^\s*scrobble_threshold:\s*(\d+)", text, re.MULTILINE)
+        if m_thr:
+            res["scrobble_threshold"] = int(m_thr.group(1))
+    except Exception:
+        pass
+    return res
+
+
+def _write_trakt_yml(sync_ratings, sync_watched, scrobble_threshold):
+    if not os.path.exists(TRAKT_YML_PATH):
+        return False
+    try:
+        with open(TRAKT_YML_PATH, "r", encoding="utf-8") as f:
+            text = f.read()
+        r_val = "true" if sync_ratings else "false"
+        w_val = "true" if sync_watched else "false"
+        thr = max(50, min(99, int(scrobble_threshold)))
+        new_text = re.sub(r"(^\s*ratings:\s*)(?:true|false)", rf"\g<1>{r_val}", text, flags=re.MULTILINE | re.IGNORECASE)
+        new_text = re.sub(r"(^\s*watched_status:\s*)(?:true|false)", rf"\g<1>{w_val}", new_text, flags=re.MULTILINE | re.IGNORECASE)
+        new_text = re.sub(r"(^\s*scrobble_threshold:\s*)\d+", rf"\g<1>{thr}", new_text, flags=re.MULTILINE)
+        if new_text != text:
+            with open(TRAKT_YML_PATH, "w", encoding="utf-8") as f:
+                f.write(new_text)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _read_qbit_limits():
+    try:
+        req = urllib.request.Request("http://127.0.0.1:8080/api/v2/app/preferences")
+        with urllib.request.urlopen(req, timeout=2.5) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+        dl_mb = round((d.get("dl_limit", 0) or 0) / (1024 * 1024), 1)
+        up_kb = int(round((d.get("up_limit", 0) or 0) / 1024))
+        return {"online": True, "dl_limit_mbps": dl_mb, "up_limit_kbps": up_kb}
+    except Exception:
+        return {"online": False, "dl_limit_mbps": 0, "up_limit_kbps": 0}
+
+
+def _write_qbit_limits(dl_limit_mbps, up_limit_kbps):
+    try:
+        dl_bytes = max(0, int(round(float(dl_limit_mbps or 0) * 1024 * 1024)))
+        up_bytes = max(0, int(round(float(up_limit_kbps or 0) * 1024)))
+        body = urllib.parse.urlencode({"json": json.dumps({"dl_limit": dl_bytes, "up_limit": up_bytes})}).encode("utf-8")
+        req = urllib.request.Request(
+            "http://127.0.0.1:8080/api/v2/app/setPreferences",
+            data=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=3):
+            return True
+    except Exception:
+        return False
+
+
+def _read_arr_rename():
+    val = None
+    online = False
+    for port, cfg_dir, field in [
+        (7878, radarr_sonarr_sync.RADARR_DIR, "renameMovies"),
+        (8989, radarr_sonarr_sync.SONARR_DIR, "renameEpisodes"),
+    ]:
+        key = radarr_sonarr_sync._get_api_key(os.path.join(cfg_dir, "config.xml"))
+        if not key:
+            continue
+        try:
+            d = radarr_sonarr_sync._api_request(f"http://127.0.0.1:{port}", key, "/api/v3/config/naming", timeout=2.5)
+            if d is not None:
+                online = True
+                val = bool(d.get(field, True)) if val is None else (val and bool(d.get(field, True)))
+        except Exception:
+            pass
+    return {"online": online, "auto_rename": True if val is None else val}
+
+
+def _write_arr_rename(enabled):
+    changed = False
+    for port, cfg_dir, field in [
+        (7878, radarr_sonarr_sync.RADARR_DIR, "renameMovies"),
+        (8989, radarr_sonarr_sync.SONARR_DIR, "renameEpisodes"),
+    ]:
+        key = radarr_sonarr_sync._get_api_key(os.path.join(cfg_dir, "config.xml"))
+        if not key:
+            continue
+        try:
+            d = radarr_sonarr_sync._api_request(f"http://127.0.0.1:{port}", key, "/api/v3/config/naming", timeout=3)
+            if d is not None and bool(d.get(field)) != bool(enabled):
+                d[field] = bool(enabled)
+                radarr_sonarr_sync._api_request(f"http://127.0.0.1:{port}", key, "/api/v3/config/naming", method="PUT", payload=d, timeout=4)
+                changed = True
+        except Exception:
+            pass
+    return changed
+
+
+def _read_allowed_hosts():
+    # Read shared user-facing hosts (excluding internal media_center_* tokens)
+    for _, path in ARR_CONFIGS:
+        if os.path.exists(path):
+            try:
+                root = ET.parse(path).getroot()
+                el = root.find("AllowedHosts")
+                if el is not None and el.text:
+                    tokens = [t.strip() for t in el.text.split(",") if t.strip() and not t.strip().startswith("media_center_")]
+                    if tokens:
+                        return ",".join(tokens)
+            except Exception:
+                pass
+    local_ip = _detect_local_ip()
+    return f"localhost,127.0.0.1,*.local,{local_ip}"
+
+
+def _write_allowed_hosts(hosts_csv):
+    base_tokens = []
+    for tok in (hosts_csv or "").split(","):
+        t = tok.strip()
+        if t and not t.startswith("media_center_") and t not in base_tokens:
+            base_tokens.append(t)
+    if not base_tokens:
+        base_tokens = ["localhost", "127.0.0.1", "*.local"]
+
+    changed_services = []
+    for svc, path in ARR_CONFIGS:
+        if not os.path.exists(path):
+            continue
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                text = f.read()
+            full_val = ",".join(base_tokens + [f"media_center_{svc}"])
+            if "<AllowedHosts>" in text:
+                new_text = re.sub(r"<AllowedHosts>.*?</AllowedHosts>", f"<AllowedHosts>{full_val}</AllowedHosts>", text, flags=re.DOTALL)
+            else:
+                new_text = text.replace("</Config>", f"  <AllowedHosts>{full_val}</AllowedHosts>\n</Config>")
+            if new_text != text:
+                with open(path, "w", encoding="utf-8") as f:
+                    f.write(new_text)
+                changed_services.append(svc)
+        except Exception:
+            pass
+    return changed_services
+
+
+def get_settings():
+    cfg = configparser.ConfigParser()
+    if os.path.exists(CONFIG_PROPERTIES_PATH):
+        cfg.read(CONFIG_PROPERTIES_PATH, encoding="utf-8")
+
+    plex_env = _read_env_file(PLEX_ENV_PATH)
+    trakt_cfg = _read_trakt_yml()
+    qbit = _read_qbit_limits()
+    arr_ren = _read_arr_rename()
+
+    return {
+        "server_port": cfg.getint("server", "port", fallback=3000),
+        "watchlist_sync_minutes": cfg.getint("automation", "watchlist_sync_minutes", fallback=5),
+        "auto_update_enabled": cfg.getboolean("automation", "auto_update_enabled", fallback=True),
+        "watched_media_action": cfg.get("automation", "watched_media_action", fallback="keep"),
+        "qbit_online": qbit["online"],
+        "dl_limit_mbps": qbit["dl_limit_mbps"],
+        "up_limit_kbps": qbit["up_limit_kbps"],
+        "arr_online": arr_ren["online"],
+        "auto_rename_media": arr_ren["auto_rename"],
+        "allowed_hosts": _read_allowed_hosts(),
+        "plex_advertise_ip": plex_env.get("PLEX_ADVERTISE_IP", f"http://{_detect_local_ip()}:32400"),
+        "plex_hostname": plex_env.get("PLEX_HOSTNAME", "podmedia"),
+        "timezone": plex_env.get("TZ", "Europe/Istanbul"),
+        "trakt_available": trakt_cfg["available"],
+        "trakt_sync_ratings": trakt_cfg["sync_ratings"],
+        "trakt_sync_watched": trakt_cfg["sync_watched"],
+        "trakt_scrobble_threshold": trakt_cfg["scrobble_threshold"],
+    }
+
+
+def save_settings(payload):
+    cfg = configparser.ConfigParser()
+    if os.path.exists(CONFIG_PROPERTIES_PATH):
+        cfg.read(CONFIG_PROPERTIES_PATH, encoding="utf-8")
+
+    for section in ("server", "paths", "podman", "automation"):
+        if not cfg.has_section(section):
+            cfg.add_section(section)
+
+    old_port = cfg.getint("server", "port", fallback=3000)
+    old_env = _read_env_file(PLEX_ENV_PATH)
+    restart_targets = []
+
+    port = max(1024, min(65535, int(payload.get("server_port", old_port))))
+    sync_min = max(1, min(180, int(payload.get("watchlist_sync_minutes", 5))))
+    auto_update = bool(payload.get("auto_update_enabled", True))
+    watched_action = str(payload.get("watched_media_action", "keep")).strip()
+    if watched_action not in ("keep", "delete_after_rating", "delete_after_24h", "delete_immediate"):
+        watched_action = "keep"
+
+    cfg.set("server", "port", str(port))
+    if not cfg.has_option("paths", "media_dir"):
+        cfg.set("paths", "media_dir", "./media")
+    if not cfg.has_option("paths", "downloads_dir"):
+        cfg.set("paths", "downloads_dir", "./downloads")
+    if not cfg.has_option("podman", "network"):
+        cfg.set("podman", "network", "media_center_net")
+    cfg.set("automation", "watchlist_sync_minutes", str(sync_min))
+    cfg.set("automation", "auto_update_enabled", "true" if auto_update else "false")
+    cfg.set("automation", "watched_media_action", watched_action)
+
+    with open(CONFIG_PROPERTIES_PATH, "w", encoding="utf-8") as f:
+        cfg.write(f)
+
+    if port != old_port:
+        restart_targets.append("podmedia")
+
+    # Apply live Watchlist interval & watched-media policy immediately
+    try:
+        import media_watcher
+        if media_watcher.watcher_instance:
+            media_watcher.watcher_instance.import_list_sync_interval = sync_min * 60
+            media_watcher.watcher_instance.watched_media_action = watched_action
+    except Exception:
+        pass
+
+    # Apply live qBittorrent speed limits
+    if "dl_limit_mbps" in payload or "up_limit_kbps" in payload:
+        _write_qbit_limits(payload.get("dl_limit_mbps", 0), payload.get("up_limit_kbps", 0))
+
+    # Apply live Radarr/Sonarr auto-rename
+    if "auto_rename_media" in payload:
+        _write_arr_rename(bool(payload.get("auto_rename_media", True)))
+
+    # Update AllowedHosts across Radarr, Sonarr, Prowlarr
+    if "allowed_hosts" in payload:
+        changed_arr = _write_allowed_hosts(payload.get("allowed_hosts", ""))
+        restart_targets.extend(changed_arr)
+
+    # Update Plex .env
+    plex_ip = str(payload.get("plex_advertise_ip", old_env.get("PLEX_ADVERTISE_IP", ""))).strip()
+    plex_host = str(payload.get("plex_hostname", old_env.get("PLEX_HOSTNAME", "podmedia"))).strip() or "podmedia"
+    tz = str(payload.get("timezone", old_env.get("TZ", "Europe/Istanbul"))).strip() or "UTC"
+    if (
+        plex_ip != old_env.get("PLEX_ADVERTISE_IP", "")
+        or plex_host != old_env.get("PLEX_HOSTNAME", "")
+        or tz != old_env.get("TZ", "")
+    ):
+        _write_env_file(PLEX_ENV_PATH, {
+            "PLEX_ADVERTISE_IP": plex_ip,
+            "PLEX_HOSTNAME": plex_host,
+            "TZ": tz,
+        })
+        restart_targets.append("plex")
+
+    # Update PlexTraktSync config.yml
+    if os.path.exists(TRAKT_YML_PATH):
+        trakt_changed = _write_trakt_yml(
+            bool(payload.get("trakt_sync_ratings", True)),
+            bool(payload.get("trakt_sync_watched", True)),
+            int(payload.get("trakt_scrobble_threshold", 80)),
+        )
+        if trakt_changed:
+            restart_targets.append("plextraktsync")
+
+    # Deduplicate while preserving order
+    seen = set()
+    restart_targets = [x for x in restart_targets if not (x in seen or seen.add(x))]
+
+    return {
+        "status": "ok",
+        "restart_needed": len(restart_targets) > 0,
+        "restart_targets": restart_targets,
+        "settings": get_settings(),
+    }
+
+
+def reset_to_defaults():
+    local_ip = _detect_local_ip()
+    defaults = {
+        "server_port": 3000,
+        "watchlist_sync_minutes": 5,
+        "auto_update_enabled": True,
+        "watched_media_action": "keep",
+        "dl_limit_mbps": 0,
+        "up_limit_kbps": 0,
+        "auto_rename_media": True,
+        "allowed_hosts": f"localhost,127.0.0.1,*.local,{local_ip}",
+        "plex_advertise_ip": f"http://{local_ip}:32400",
+        "plex_hostname": "podmedia",
+        "timezone": "Europe/Istanbul",
+        "trakt_sync_ratings": True,
+        "trakt_sync_watched": True,
+        "trakt_scrobble_threshold": 80,
+    }
+    res = save_settings(defaults)
+    res["reset"] = True
+    return res
+
+
+def restart_services_generator(target_csv=""):
+    """Restarts requested (or all currently running) services to apply changed config/env settings."""
+    states, _ = podman_manager.get_container_states()
+    requested = [t.strip().lower() for t in (target_csv or "").split(",") if t.strip()]
+    if not requested:
+        # Restart all currently running PodMedia containers
+        requested = [name.replace("media_center_", "") for name, running in states.items() if running]
+
+    if not requested:
+        yield "[i] Çalışan servis bulunamadı.\n"
+        return
+
+    services_dir = os.path.join(PROJECT_ROOT, "services")
+    for svc in requested:
+        if svc == "podmedia":
+            continue
+        cname = f"media_center_{svc}"
+        if not states.get(cname, False):
+            yield f"[i] {svc.upper()} şu an kapalı (yeniden başlatma atlandı).\n"
+            continue
+        if svc == "plex":
+            # Force recreate so updated .env (PLEX_ADVERTISE_IP, TZ, PLEX_HOSTNAME) takes effect
+            yield "[+] Recreating Plex container with updated environment...\n"
+            for log in podman_manager.run_command_generator("podman-compose up -d --force-recreate plex", cwd=os.path.join(services_dir, "plex")):
+                yield log
+        else:
+            yield f"[+] Restarting {svc.upper()} ({cname})...\n"
+            for log in podman_manager.run_command_generator(f"podman restart {cname}"):
+                yield log
+
+    yield "\n[✓] SERVİSLER YENİDEN BAŞLATILDI — Ayarlar aktif!\n"

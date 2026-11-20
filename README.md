@@ -1,46 +1,69 @@
-# 🍿 PodMedia
+# <img src="app/favicon.svg" width="32" align="absmiddle" alt="PodMedia"> PodMedia
 
-**PodMedia** is a lightweight, containerized Home Media Suite powered by **Podman**, **Python**, and a modern dark-mode Single Page Web Dashboard.
+**PodMedia** is a lightweight, unified, containerized Home Media Suite powered by **Podman**, **Python**, and a clean 3-tab Web Application (**Home**, **Library**, **Admin**) with Soft Light & Calm Dark themes and TR/EN localization.
 
-It provides selective, fine-grained control over your media automation ecosystem (Plex, Radarr, Sonarr, Prowlarr, qBittorrent, Slskd, Beets, FlareSolverr) without heavy dependencies or system bloat.
+Instead of juggling ten separate tools, PodMedia gives you one cohesive experience for streaming, watchlist automation, media search, library management, lossless music tagging, external drive archiving, and granular service administration — across **Windows**, **macOS**, and **Linux**.
 
 ---
 
 ## 📂 Project Architecture
 
-```
+```text
 PodMedia/
-├── README.md                      # Comprehensive project documentation
+├── README.md                      # Project documentation
 ├── requirements.txt               # Python package dependencies
-├── setup.py                       # Automated environment, config & launcher generator
-├── config.properties.example      # Root properties template
-├── app/                           # Application Source Code
-│   ├── app.py                     # HTTP Server & API Router
-│   ├── podman_manager.py          # Container Execution Engine
+├── setup.py                       # Cross-platform setup, config & launcher generator
+├── config.properties.example      # Root server, path & automation template
+├── app/                           # PodMedia Web App & Automation Engine
+│   ├── app.py                     # HTTP Server, SSE Log Streamer & API Router
+│   ├── index.html                 # Unified 3-Tab Web UI (Light/Dark, TR/EN)
+│   ├── hub_api.py                 # Unified Media Search, Library & Queue API
+│   ├── settings_manager.py        # Unified App & Service Settings + Auto-Restart
+│   ├── podman_manager.py          # Container & Mode Orchestration Engine
+│   ├── media_watcher.py           # File Watcher, Trakt/Plex Sync & Watched Cleanup
+│   ├── radarr_sonarr_sync.py      # Radarr/Sonarr Library & ImportList Sync
+│   ├── disk_manager.py            # External Drive Detection, Sleep & Safe Release
+│   ├── transfer_manager.py        # Background Local-to-External Media Transfer
+│   ├── auto_updater.py            # Container Image Update Checker
 │   ├── tray.py                    # Cross-Platform System Tray App
-│   ├── autostart.py               # Boot Startup Manager
-│   └── index.html                 # Dashboard UI Template
-└── services/                      # Container Service Specifications
+│   ├── autostart.py               # OS Boot Startup Manager
+│   ├── favicon.svg                # Original PodMedia Vector Icon
+│   ├── favicon.ico                # Multi-size Browser & Windows Icon
+│   └── apple-touch-icon.png       # High-DPI Touch & System Tray Icon
+└── services/                      # Container Service Definitions & Templates
     ├── plex/
     │   ├── podman-compose.yml
     │   └── .env.example
     └── tools/
         ├── podman-compose.yml
-        ├── beets/
-        ├── qbittorrent/
-        └── slskd/
+        ├── beets/                 # config.yaml.example
+        ├── metube/                # YouTube / web media downloader
+        ├── plextraktsync/         # config.yml.example (Optional Plex <-> Trakt)
+        ├── prowlarr/              # Indexer manager
+        ├── qbittorrent/           # qBittorrent.conf.example
+        ├── radarr/                # config.xml.example
+        ├── slskd/                 # slskd.yml.example
+        └── sonarr/                # config.xml.example
 ```
 
 ---
 
 ## ⚡ Key Features
 
-- **Automated Initialization**: Single command setup (`python setup.py`) that prepares pipeline directory structures, personal configuration templates, OS-specific launchers (`start.bat` / `start.sh`), and verifies Podman VM health.
-- **Selective Container Control**: 1-second instant toggle switches for individual applications or predefined operation modes (*Stream Mode*, *Download Mode*, *Music Mode*).
-- **Automated Music Pipeline**: Soulseek (Slskd) downloads FLAC/MP3 tracks directly into `/downloads/music`, where Beets auto-tags them via MusicBrainz/Discogs/iTunes and moves them cleanly to `/media/music`.
-- **Real-Time Stream Logs**: Built-in Server-Sent Events (SSE) modal streams live Podman CLI execution logs directly to your browser.
-- **Dynamic Single Source of Truth**: All paths (`media_dir`, `downloads_dir`) are dynamically resolved from `config.properties` and injected into container volume mounts.
-- **Rootless & Secure**: Built from the ground up for Podman & Podman Compose with clean, git-ignored template configs.
+- **Unified 3-Tab Web Experience**:
+  - **Home**: One-click control over 3 core modes (*Cinema & Watch*, *Library & Downloads*, *Music Library*), connected Plex/Trakt status, and compact hybrid storage overview.
+  - **Library**: Search any movie or TV show and add/download in one click via Radarr/Sonarr, monitor live qBittorrent downloads, and filter your full media library.
+  - **Admin**: System & disk controls, per-service toggles and links, plus a collapsible **Advanced Application & Service Settings** panel.
+- **Trakt.tv & Plex Watchlist Automation**: Direct Trakt ↔ Plex Watchlist synchronization into Radarr & Sonarr (on startup and every `N` minutes) plus optional `PlexTraktSync` coupled to Plex's lifecycle.
+- **Smart Watched Media Cleanup Policies**: Configurable from Admin Settings:
+  - `keep` — Keep files on disk (default).
+  - `delete_after_rating` — Deletes watched movies from disk & watchlists only *after* you rate them (on **either Plex or Trakt**), ensuring two-way watched & rating sync completes first and protecting re-downloaded favorites via `addedAt`.
+  - `delete_after_24h` / `delete_immediate` — Automatic cleanup after watching, while always skipping actively streaming sessions.
+- **Hybrid Local + External Disk Management**: Recognizes external archive drives by hardware serial number (even if drive letters change), transfers local media to external storage in the background with live progress/ETA, supports safe disk sleep (0 RPM) / wake, and cleanly releases mounts on shutdown.
+- **Automated Music Pipeline**: Soulseek (Slskd) and MeTube download audio into `/downloads/music`, where Beets auto-tags via MusicBrainz/Discogs/iTunes and organizes files into `/media/music`.
+- **Unified Settings & Auto-Updates**: Edit panel port, watched media policy, sync interval, qBittorrent speed limits, `{tmdb}/{tvdb}` auto-renaming, LAN `AllowedHosts`, Plex advertise IP/hostname/TZ, and Trakt sync options directly from the UI — with automatic restart of affected services and one-click reset to defaults.
+- **Smart Home / Homebridge Ready**: `setup.py` generates symmetric mode scripts (`start_plex` / `stop_plex`, `start_downloads` / `stop_downloads`, `start`, `stop`, `status`) with `.running` state files and Windows Scheduled Tasks for zero-UAC headless triggering.
+- **Rootless & Portable**: Built for Podman & Podman Compose with git-ignored personal configs, tokens, and generated launchers.
 
 ---
 
@@ -49,21 +72,23 @@ PodMedia/
 | Application | Role | Default Port |
 | :--- | :--- | :--- |
 | **Plex** | Media Server & Streaming | `32400` |
+| **PlexTraktSync** | Optional Plex ↔ Trakt.tv Sync | Background |
 | **Radarr** | Movie Management & Automation | `7878` |
 | **Sonarr** | TV Show Management & Automation | `8989` |
 | **Prowlarr** | Indexer Management | `9696` |
 | **qBittorrent** | Torrent Download Client | `8080` |
-| **Slskd** | Soulseek FLAC Downloader | `5030` |
-| **Beets** | Music Auto-Tagger & Library Manager | Custom CLI |
 | **FlareSolverr** | Cloudflare Bypass Proxy | `8191` |
+| **Slskd** | Soulseek FLAC Downloader | `5030` |
+| **MeTube** | YouTube / Web Audio & Video Downloader | `8081` |
+| **Beets** | Music Auto-Tagger & Library Manager | CLI / Auto |
 
 ---
 
 ## 🚀 Step-by-Step Installation
 
 ### Prerequisites
-- **Python 3.8+** ([python.org](https://www.python.org/downloads/))
-- **Podman** ([podman.io](https://podman.io)) & `podman-compose` (`pip install podman-compose`)
+- **Python 3.9+** ([python.org](https://www.python.org/downloads/))
+- **Podman** ([podman.io](https://podman.io)) & `podman-compose`
 
 ---
 
@@ -77,22 +102,48 @@ cd PodMedia
 ```bash
 python setup.py
 ```
-*This step creates local directory structures (`downloads/`, `media/`), generates personalized local `.env`, `slskd.yml`, `config.yaml`, `qBittorrent.conf`, generates OS-specific launcher (`start.bat` / `start.sh`), and verifies your Podman machine health.*
+*This installs Python dependencies (`pystray`, `Pillow`, `podman-compose`), creates all pipeline & service config directories (`downloads/`, `media/`, `services/tools/*/config`), initializes local templates (`config.properties`, `services/plex/.env`, `slskd.yml`, `beets/config.yaml`, `qBittorrent.conf`, `radarr/config.xml`, `sonarr/config.xml`, `plextraktsync/config.yml`), verifies Podman health, and generates OS-specific launchers (`start`/`stop`/`status` + `plex` & `downloads` mode scripts).*
 
-### Step 3: (Optional) Custom Directory Paths
-If you store your media on external drives (e.g. `E:/Media` or `D:/Downloads`), edit your generated `config.properties`:
+### Step 3: (Optional) Customize Paths & Automation
+Edit the generated `config.properties` (or adjust automation settings later from **Admin → Advanced Application & Service Settings**):
 ```ini
+[server]
+port = 3000
+
 [paths]
-media_dir = E:/Media
-downloads_dir = D:/Downloads
+media_dir = ./media
+downloads_dir = ./downloads
+
+[podman]
+network = media_center_net
+
+[automation]
+watchlist_sync_minutes = 5
+auto_update_enabled = true
+watched_media_action = keep
 ```
 
-### Step 4: Launch PodMedia
-- **On Windows**: Double-click `start.bat` or run `.\start.bat`
-- **On macOS / Linux**: Run `./start.sh`
+### Step 4: (Optional) Connect Trakt.tv via PlexTraktSync
+If you want two-way Plex ↔ Trakt.tv watched, rating, and watchlist synchronization, run the one-time interactive login after starting Plex:
+```bash
+podman run --rm -it --network media_center_net \
+  -v ./services/tools/plextraktsync/config:/app/config \
+  ghcr.io/taxel/plextraktsync:latest login
+```
+Once `.pytrakt.json` and `servers.yml` exist in `services/tools/plextraktsync/config/`, PodMedia automatically detects Trakt and starts/stops `PlexTraktSync` alongside Plex.
 
-### Step 5: Access Control Panel
-Open **`http://localhost:3000`** in your browser or phone to start managing your media services!
+### Step 5: Launch & Stop PodMedia
+- **Windows**:
+  - Launch dashboard: `.\start.bat` (or double-click `start.bat`)
+  - Control modes directly: `.\start_plex.bat`, `.\stop_plex.bat`, `.\start_downloads.bat`, `.\stop_downloads.bat`
+  - Stop everything & release external drives: `.\stop.bat`
+- **macOS / Linux**:
+  - Launch dashboard: `./start.sh`
+  - Control modes directly: `./start_plex.sh`, `./stop_plex.sh`, `./start_downloads.sh`, `./stop_downloads.sh`
+  - Stop everything & release external drives: `./stop.sh`
+
+### Step 6: Open PodMedia
+Open **`http://localhost:3000`** in your browser (or `http://<your-lan-ip>:3000` from your phone/tablet on the same network).
 
 ---
 

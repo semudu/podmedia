@@ -153,3 +153,16 @@ services:
       - media_center_net
     restart: unless-stopped
 
+  plextraktsync:
+    container_name: media_center_plextraktsync
+    image: ghcr.io/taxel/plextraktsync:latest
+    environment:
+      - TZ=${TZ:-Europe/Istanbul}
+    volumes:
+      - ./plextraktsync/config:/app/config:Z
+    command: ["sh", "-c", "sleep 8; python -m plextraktsync sync || true; exec python -m plextraktsync watch"]
+    networks:
+      - media_center_net
+    restart: unless-stopped
+
+

@@ -28,14 +28,14 @@ def _get_api_key(xml_path):
         pass
     return None
 
-def _api_request(base_url, api_key, endpoint, method="GET", payload=None):
+def _api_request(base_url, api_key, endpoint, method="GET", payload=None, timeout=4):
     url = f"{base_url.rstrip('/')}/{endpoint.lstrip('/')}"
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
     headers = {"X-Api-Key": api_key}
     if data is not None:
         headers["Content-Type"] = "application/json"
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.urlopen(req, timeout=4) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         raw = resp.read()
         return json.loads(raw.decode("utf-8")) if raw else None
 

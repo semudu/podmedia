@@ -21,6 +21,7 @@ DOWNLOADS_DIR = config.get('paths', 'downloads_dir', fallback='./downloads')
 
 ALL_CONTAINERS = [
     'media_center_plex',
+    'media_center_plextraktsync',
     'media_center_radarr',
     'media_center_sonarr',
     'media_center_prowlarr',
@@ -32,6 +33,7 @@ ALL_CONTAINERS = [
 ]
 
 TOOL_MAP = {
+    'media_center_plextraktsync': 'plextraktsync',
     'media_center_radarr': 'radarr',
     'media_center_sonarr': 'sonarr',
     'media_center_prowlarr': 'prowlarr',
@@ -41,6 +43,14 @@ TOOL_MAP = {
     'media_center_beets': 'beets',
     'media_center_metube': 'metube'
 }
+
+def is_plextraktsync_configured():
+    """Returns True if PlexTraktSync has completed initial Plex & Trakt login."""
+    cfg_dir = os.path.join(project_root, 'services', 'tools', 'plextraktsync', 'config')
+    return (
+        os.path.exists(os.path.join(cfg_dir, '.pytrakt.json'))
+        and os.path.exists(os.path.join(cfg_dir, 'servers.yml'))
+    )
 
 def subproc_kwargs():
     """Returns platform-specific subprocess arguments to prevent terminal window flashing on Windows."""
@@ -284,6 +294,13 @@ def apply_target_state(target_containers):
 
     services_dir = os.path.join(project_root, 'services')
 
+    # Auto-couple PlexTraktSync with Plex only when configured (has .pytrakt.json & servers.yml)
+    target_containers = set(target_containers)
+    if 'media_center_plex' in target_containers and is_plextraktsync_configured():
+        target_containers.add('media_center_plextraktsync')
+    elif not is_plextraktsync_configured():
+        target_containers.discard('media_center_plextraktsync')
+
     # Start Plex if targeted
     if 'media_center_plex' in target_containers:
         yield "[+] Starting Plex Media Server...\n"
@@ -303,6 +320,17 @@ def apply_target_state(target_containers):
         tools_dir = os.path.join(services_dir, 'tools')
         for log in run_command_generator(f'podman-compose up -d {tools_str}', cwd=tools_dir):
             yield log
+        if 'radarr' in tools_to_start or 'sonarr' in tools_to_start:
+            try:
+                import media_watcher
+                if 'radarr' in tools_to_start and 'sonarr' in tools_to_start:
+                    media_watcher.trigger_import_list_sync_on_startup('both')
+                elif 'radarr' in tools_to_start:
+                    media_watcher.trigger_import_list_sync_on_startup('radarr')
+                else:
+                    media_watcher.trigger_import_list_sync_on_startup('sonarr')
+            except Exception:
+                pass
 
     # Stop unneeded containers
     res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
@@ -535,6 +563,7 @@ def start_single_app(app_name):
 
     app_map = {
         'plex': ('plex', 'plex'),
+        'plextraktsync': ('tools', 'plextraktsync'),
         'radarr': ('tools', 'radarr'),
         'sonarr': ('tools', 'sonarr'),
         'prowlarr': ('tools', 'prowlarr'),
@@ -553,9 +582,20 @@ def start_single_app(app_name):
             yield log
         if app_name == 'plex':
             write_plex_state_file()
+            if is_plextraktsync_configured():
+                yield "[+] Starting PlexTraktSync companion service...\n"
+                tools_dir = os.path.join(project_root, 'services', 'tools')
+                for log in run_command_generator('podman-compose up -d plextraktsync', cwd=tools_dir):
+                    yield log
             try:
                 import media_watcher
                 media_watcher.trigger_plex_full_scan_on_startup()
+            except Exception:
+                pass
+        elif app_name in ('radarr', 'sonarr'):
+            try:
+                import media_watcher
+                media_watcher.trigger_import_list_sync_on_startup(app_name)
             except Exception:
                 pass
         yield f"\n[✓] '{app_name.upper()}' STARTED SUCCESSFULLY!\n"
@@ -573,6 +613,15 @@ def stop_single_app(app_name):
     yield f"[-] Stopping '{app_name.upper()}' service ({container_name})...\n"
     for log in run_command_generator(f'podman stop {container_name}'):
         yield log
+    if app_name == 'plex':
+        chk = subprocess.run(
+            ['podman', 'ps', '-q', '--filter', 'name=^media_center_plextraktsync$'],
+            capture_output=True, text=True, **subproc_kwargs()
+        )
+        if chk.returncode == 0 and chk.stdout.strip():
+            yield "[-] Stopping PlexTraktSync companion service (media_center_plextraktsync)...\n"
+            for log in run_command_generator('podman stop media_center_plextraktsync'):
+                yield log
     for log in release_external_mounts_with_logs():
         yield log
     yield f"\n[✓] '{app_name.upper()}' STOPPED SUCCESSFULLY!\n"
