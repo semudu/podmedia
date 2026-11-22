@@ -13,4 +13,4 @@ watchlist_sync_minutes = 5
 auto_update_enabled = true
 watched_media_action = keep
 disk_wake_policy = media_only
-music_start_plex = false
+music_start_slskd = true

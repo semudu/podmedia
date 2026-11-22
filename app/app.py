@@ -1,12 +1,24 @@
 import sys
 import os
 
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, 'w')
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, 'w')
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_RUN_DIR = os.path.join(_PROJECT_ROOT, 'run')
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
+if sys.stdout is None or sys.stderr is None:
+    try:
+        os.makedirs(_RUN_DIR, exist_ok=True)
+        _log_path = os.path.join(_RUN_DIR, 'app.log')
+        if os.path.exists(_log_path) and os.path.getsize(_log_path) > 2 * 1024 * 1024:
+            open(_log_path, 'w', encoding='utf-8').close()
+        _log_file = open(_log_path, 'a', encoding='utf-8', errors='replace', buffering=1)
+    except Exception:
+        _log_file = open(os.devnull, 'w')
+    if sys.stdout is None:
+        sys.stdout = _log_file
+    if sys.stderr is None:
+        sys.stderr = _log_file
+
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import threading
 import time
 import urllib.parse
@@ -20,21 +32,16 @@ from disk_manager import disk_manager
 PORT = podman_manager.PORT
 is_busy = False
 
-def get_action_generator(action, target):
-    """Routes UI action requests to corresponding generator functions in podman_manager."""
-    states, groups = podman_manager.get_container_states()
-    target_containers = set()
 
-    for c_name, is_running in states.items():
-        if is_running:
-            target_containers.add(c_name)
+def get_action_generator(action, target):
+    """Routes UI & CLI action requests to the declarative mode/container engine in podman_manager."""
+    states, groups = podman_manager.get_container_states()
 
     if action == 'start-all':
-        target_containers = set(podman_manager.ALL_CONTAINERS)
-        return podman_manager.apply_target_state(target_containers)
+        return podman_manager.reconcile_modes(set(podman_manager.VALID_MODES))
 
     elif action == 'stop-all':
-        return podman_manager.stop_all_containers(power_down=False)
+        return podman_manager.stop_all_containers(power_down=None)
 
     elif action == 'quit-all':
         return podman_manager.stop_all_containers(power_down=True)
@@ -44,69 +51,27 @@ def get_action_generator(action, target):
         return settings_manager.restart_services_generator(target)
 
     elif action in ('toggle-group', 'start-group', 'stop-group'):
-        group = target.lower()
-        current_group_on = groups.get(group, False)
-        should_start = (action == 'start-group') or (action == 'toggle-group' and not current_group_on)
+        mode = podman_manager.normalize_mode(target)
+        if mode not in podman_manager.VALID_MODES:
+            def bad_gen():
+                yield f"[X] Unknown mode: {target}\n"
+            return bad_gen()
 
-        music_start_apps = ['plex', 'aurral', 'slskd'] if podman_manager.get_music_start_plex() else ['aurral', 'slskd']
-        group_start_map = {
-            'plex': ['plex'],
-            'downloads': ['radarr', 'sonarr', 'prowlarr', 'qbittorrent', 'flaresolverr'],
-            'music': music_start_apps
-        }
-        group_stop_map = {
-            'plex': ['plex'],
-            'downloads': ['radarr', 'sonarr', 'prowlarr', 'qbittorrent', 'flaresolverr'],
-            'music': ['aurral', 'slskd']
-        }
-        app_container_map = {
-            'plex': 'media_center_plex',
-            'plextraktsync': 'media_center_plextraktsync',
-            'radarr': 'media_center_radarr',
-            'sonarr': 'media_center_sonarr',
-            'prowlarr': 'media_center_prowlarr',
-            'qbittorrent': 'media_center_qbittorrent',
-            'flaresolverr': 'media_center_flaresolverr',
-            'aurral': 'media_center_aurral',
-            'slskd': 'media_center_slskd'
-        }
+        active_modes = {m for m, is_on in groups.items() if is_on}
+        # Also honor any mode state file currently written (e.g. concurrent autostart calls)
+        for m in podman_manager.VALID_MODES:
+            if podman_manager.is_mode_state_active(m):
+                active_modes.add(m)
+
+        current_on = groups.get(mode, False)
+        should_start = (action == 'start-group') or (action == 'toggle-group' and not current_on)
 
         if should_start:
-            group_apps = group_start_map.get(group, [])
-            if group == 'plex':
-                podman_manager.write_plex_state_file()
-            elif group == 'downloads':
-                podman_manager.write_downloads_state_file()
-            elif group == 'music':
-                podman_manager.write_music_state_file()
-            apps_to_start = [a for a in group_apps if not states.get(app_container_map[a], False)]
-            if not apps_to_start:
-                def empty_gen(): yield f"[✓] '{group.upper()}' group is already active.\n"
-                return empty_gen()
-            
-            def group_start_gen():
-                for app_name in apps_to_start:
-                    for log in podman_manager.start_single_app(app_name):
-                        yield log
-            return group_start_gen()
+            active_modes.add(mode)
         else:
-            group_apps = group_stop_map.get(group, [])
-            if group == 'plex':
-                podman_manager.remove_plex_state_file()
-            elif group == 'downloads':
-                podman_manager.remove_downloads_state_file()
-            elif group == 'music':
-                podman_manager.remove_music_state_file()
-            apps_to_stop = [a for a in group_apps if states.get(app_container_map[a], False)]
-            if not apps_to_stop:
-                def empty_gen(): yield f"[✓] '{group.upper()}' group is already stopped.\n"
-                return empty_gen()
+            active_modes.discard(mode)
 
-            def group_stop_gen():
-                for app_name in apps_to_stop:
-                    for log in podman_manager.stop_single_app(app_name):
-                        yield log
-            return group_stop_gen()
+        return podman_manager.reconcile_modes(active_modes)
 
     elif action == 'toggle-app':
         app = target.lower()
@@ -132,7 +97,8 @@ def get_action_generator(action, target):
             yield "Invalid action.\n"
         return empty_gen()
 
-class AppHTTPServer(HTTPServer):
+
+class AppHTTPServer(ThreadingHTTPServer):
     allow_reuse_address = (os.name != 'nt')
 
     def server_bind(self):
@@ -145,6 +111,7 @@ class AppHTTPServer(HTTPServer):
     def handle_error(self, request, client_address):
         # Silently ignore client socket disconnections (e.g. closing browser tab during SSE)
         pass
+
 
 class AppHandler(BaseHTTPRequestHandler):
 
@@ -216,23 +183,18 @@ class AppHandler(BaseHTTPRequestHandler):
         elif path == '/api/status':
             containers, groups = podman_manager.get_container_states()
             if not is_busy:
-                if groups.get("plex"):
-                    podman_manager.write_plex_state_file()
-                else:
-                    podman_manager.remove_plex_state_file()
-                if groups.get("downloads"):
-                    podman_manager.write_downloads_state_file()
-                else:
-                    podman_manager.remove_downloads_state_file()
-                if groups.get("music"):
-                    podman_manager.write_music_state_file()
-                else:
-                    podman_manager.remove_music_state_file()
+                for m in podman_manager.VALID_MODES:
+                    if groups.get(m):
+                        podman_manager.write_mode_state_file(m)
+                    else:
+                        podman_manager.remove_mode_state_file(m)
             ext_disk = podman_manager.get_external_disk_info()
             transfer_state = transfer_manager.get_status()
+            plex_disk_mode = podman_manager.get_plex_disk_mode(containers.get('media_center_plex', False))
             self.send_json({
                 "containers": containers,
                 "groups": groups,
+                "plex_disk_mode": plex_disk_mode,
                 "is_busy": is_busy,
                 "external_disk": ext_disk,
                 "transfer": transfer_state,
@@ -276,19 +238,17 @@ class AppHandler(BaseHTTPRequestHandler):
             drive_letter = query.get('drive', [''])[0]
             if drive_letter:
                 res = disk_manager.set_target_disk(drive_letter)
-                # Refresh dynamic disk status
                 podman_manager.get_external_disk_info()
                 self.send_json(res)
             else:
                 self.send_json({"status": "error", "message": "Eksik parametre: drive"}, 400)
 
         elif path == '/api/disks/sleep':
-            containers, _ = podman_manager.get_container_states()
-            active_disk_svcs = [c for c in podman_manager.EXTERNAL_DISK_CONTAINERS if containers.get(c, False)]
+            active_disk_svcs = podman_manager.get_containers_using_external_disk()
             if active_disk_svcs:
                 self.send_json({
                     "status": "error",
-                    "message": "Diski uyutmadan önce harici diski kullanan servisleri (Plex / Radarr / Sonarr) durdurun."
+                    "message": "Diski uyutmadan önce harici diski kullanan modları (Film & Dizi / İndirme) kapatın."
                 })
                 return
             podman_manager.release_external_mounts(power_down=True)
@@ -376,15 +336,11 @@ class AppHandler(BaseHTTPRequestHandler):
             res = auto_updater.auto_updater.check_and_update_running()
             self.send_json(res)
 
-        elif path in ('/api/autostart/plex', '/api/autostart/downloads', '/api/autostart/music'):
-            mode = path.rsplit('/', 1)[-1]
-            if mode == 'plex':
-                podman_manager.write_plex_state_file()
-            elif mode == 'downloads':
-                podman_manager.write_downloads_state_file()
-            elif mode == 'music':
-                podman_manager.write_music_state_file()
+        elif path in ('/api/autostart/video', '/api/autostart/plex', '/api/autostart/downloads', '/api/autostart/music'):
+            mode = podman_manager.normalize_mode(path.rsplit('/', 1)[-1])
+            podman_manager.write_mode_state_file(mode)
             self.send_json({"status": "starting", "service": mode})
+
             def _bg_start_mode(target_mode=mode):
                 global is_busy
                 for _ in range(240):
@@ -393,10 +349,6 @@ class AppHandler(BaseHTTPRequestHandler):
                     time.sleep(0.5)
                 is_busy = True
                 try:
-                    wake_policy = podman_manager.get_disk_wake_policy()
-                    needs_disk = (target_mode in ('plex', 'downloads')) or (target_mode == 'music' and podman_manager.get_music_start_plex())
-                    if wake_policy == 'always' or (wake_policy == 'media_only' and needs_disk):
-                        disk_manager.wake_all_external_drives()
                     for _ in get_action_generator('start-group', target_mode):
                         pass
                 except Exception as e:
@@ -405,60 +357,56 @@ class AppHandler(BaseHTTPRequestHandler):
                     is_busy = False
             threading.Thread(target=_bg_start_mode, daemon=True).start()
 
-        elif path in ('/api/autostop/plex', '/api/autostop/downloads', '/api/autostop/music'):
-            mode = path.rsplit('/', 1)[-1]
-            if mode == 'plex':
-                podman_manager.remove_plex_state_file()
-            elif mode == 'downloads':
-                podman_manager.remove_downloads_state_file()
-            elif mode == 'music':
-                podman_manager.remove_music_state_file()
+        elif path in ('/api/autostop/video', '/api/autostop/plex', '/api/autostop/downloads', '/api/autostop/music'):
+            mode = podman_manager.normalize_mode(path.rsplit('/', 1)[-1])
+            podman_manager.remove_mode_state_file(mode)
 
-            _, groups = podman_manager.get_container_states()
-            other_modes = [m for m in ('plex', 'downloads', 'music') if m != mode]
-            other_running = any(groups.get(m, False) for m in other_modes)
-            if other_running:
-                self.send_json({
-                    "status": f"stopping_{mode}",
-                    "other_running": True,
-                    "message": f"Diğer modlar aktif olduğu için yalnızca {mode} kapatılıyor..."
-                })
-                def _bg_stop_mode(target_mode=mode):
-                    global is_busy
-                    for _ in range(240):
-                        if not is_busy:
-                            break
-                        time.sleep(0.5)
-                    is_busy = True
-                    try:
-                        for _ in get_action_generator('stop-group', target_mode):
-                            pass
-                    except Exception as e:
-                        print(f"Background {target_mode} stop error:", e)
-                    finally:
-                        is_busy = False
-                threading.Thread(target=_bg_stop_mode, daemon=True).start()
-            else:
-                podman_manager.remove_state_file()
-                self.send_json({
-                    "status": "stopping_all",
-                    "other_running": False,
-                    "message": f"Başka aktif mod olmadığı için {mode} ve PodMedia tamamen kapatılıyor..."
-                })
+            self.send_json({
+                "status": f"stopping_{mode}",
+                "message": f"{mode} durduruluyor; başka aktif mod kalmazsa PodMedia ve harici disk kapatılacak..."
+            })
+
+            server_ref = self.server
+            def _bg_autostop(target_mode=mode):
+                global is_busy
+                for _ in range(240):
+                    if not is_busy:
+                        break
+                    time.sleep(0.5)
+                is_busy = True
+                should_exit = False
                 try:
-                    self.server.socket.close()
-                except Exception:
-                    pass
-                def _async_quit_from_mode():
-                    time.sleep(0.2)
+                    for _ in get_action_generator('stop-group', target_mode):
+                        pass
+
+                    containers_after, groups_after = podman_manager.get_container_states()
+                    any_container_up = any(containers_after.values())
+                    any_mode_up = any(groups_after.values())
+                    any_mode_file = podman_manager.any_mode_state_file_exists()
+
+                    if not any_container_up and not any_mode_up and not any_mode_file:
+                        should_exit = True
+                except Exception as e:
+                    print(f"Background {target_mode} stop error:", e)
+                finally:
+                    is_busy = False
+
+                if should_exit:
+                    print("[!] All modes & containers are stopped after autostop — sleeping external disk and shutting down PodMedia...")
+                    podman_manager.remove_state_file()
+                    try:
+                        server_ref.socket.close()
+                    except Exception:
+                        pass
                     try:
                         import media_watcher
                         media_watcher.stop_media_watcher()
                     except Exception:
                         pass
-                    podman_manager.stop_all_containers_sync()
+                    podman_manager.stop_all_containers_sync(power_down=True)
                     os._exit(0)
-                threading.Thread(target=_async_quit_from_mode, daemon=True).start()
+
+            threading.Thread(target=_bg_autostop, daemon=True).start()
 
         elif path == '/api/system/quit':
             podman_manager.remove_state_file()
@@ -474,7 +422,7 @@ class AppHandler(BaseHTTPRequestHandler):
                     media_watcher.stop_media_watcher()
                 except Exception:
                     pass
-                podman_manager.stop_all_containers_sync()
+                podman_manager.stop_all_containers_sync(power_down=True)
                 os._exit(0)
             threading.Thread(target=_async_quit, daemon=True).start()
 
@@ -563,7 +511,6 @@ class AppHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         return
 
-import threading
 
 def is_port_in_use(port):
     import socket
@@ -573,64 +520,71 @@ def is_port_in_use(port):
     except Exception:
         return False
 
+
+def _parse_start_modes_from_argv():
+    modes = []
+    if '--start-video' in sys.argv or '--start-plex' in sys.argv:
+        modes.append('video')
+    if '--start-downloads' in sys.argv:
+        modes.append('downloads')
+    if '--start-music' in sys.argv:
+        modes.append('music')
+    return modes
+
+
+def _parse_stop_mode_from_argv():
+    for flag, mode in (
+        ('--stop-video', 'video'),
+        ('--stop-plex', 'video'),
+        ('--stop-downloads', 'downloads'),
+        ('--stop-music', 'music'),
+    ):
+        if flag in sys.argv:
+            return mode
+    return None
+
+
 def run():
     global is_busy
     if '--stop' in sys.argv:
-        podman_manager.stop_all_containers_sync()
+        podman_manager.stop_all_containers_sync(power_down=True)
         os._exit(0)
 
-    for stop_mode in ('plex', 'downloads', 'music'):
-        if f'--stop-{stop_mode}' in sys.argv:
-            import urllib.request
-            if stop_mode == 'plex':
-                podman_manager.remove_plex_state_file()
-            elif stop_mode == 'downloads':
-                podman_manager.remove_downloads_state_file()
-            else:
-                podman_manager.remove_music_state_file()
-            try:
-                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostop/{stop_mode}", timeout=1.5)
-            except Exception:
-                _, groups = podman_manager.get_container_states()
-                others = [m for m in ('plex', 'downloads', 'music') if m != stop_mode]
-                if any(groups.get(m, False) for m in others):
-                    for _ in get_action_generator('stop-group', stop_mode):
-                        pass
-                else:
-                    podman_manager.stop_all_containers_sync()
-            os._exit(0)
+    stop_mode = _parse_stop_mode_from_argv()
+    if stop_mode:
+        import urllib.request
+        podman_manager.remove_mode_state_file(stop_mode)
+        try:
+            urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostop/{stop_mode}", timeout=4.0).close()
+        except Exception:
+            for _ in get_action_generator('stop-group', stop_mode):
+                pass
+            containers_after, groups_after = podman_manager.get_container_states()
+            if not any(containers_after.values()) and not any(groups_after.values()) and not podman_manager.any_mode_state_file_exists():
+                podman_manager.stop_all_containers_sync(power_down=True)
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/system/quit", timeout=1.5).close()
+                except Exception:
+                    pass
+        os._exit(0)
 
-    start_plex_flag = ('--start-plex' in sys.argv)
-    start_downloads_flag = ('--start-downloads' in sys.argv)
-    start_music_flag = ('--start-music' in sys.argv)
+    start_modes = _parse_start_modes_from_argv()
     is_daemon = ('--daemon' in sys.argv)
 
-    # On Windows, if invoked without --daemon (e.g. from start.bat, start_plex.bat, start_downloads.bat, start_music.bat, or Homebridge),
-    # detach immediately with closed file descriptors so callers like Node.js exec never hang on open stdio pipes.
+    # On Windows, if invoked without --daemon (e.g. from scripts/*.bat or Homebridge),
+    # detach immediately with closed stdio handles so callers never hang on open pipes.
     if os.name == 'nt' and not is_daemon:
         import urllib.request
         import subprocess
         try:
             urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/ping", timeout=0.6)
-            # Server is already running!
-            if start_plex_flag:
-                podman_manager.write_plex_state_file()
-                try:
-                    urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/plex", timeout=1.0)
-                except Exception:
-                    pass
-            elif start_downloads_flag:
-                podman_manager.write_downloads_state_file()
-                try:
-                    urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/downloads", timeout=1.0)
-                except Exception:
-                    pass
-            elif start_music_flag:
-                podman_manager.write_music_state_file()
-                try:
-                    urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/music", timeout=1.0)
-                except Exception:
-                    pass
+            if start_modes:
+                for m in start_modes:
+                    podman_manager.write_mode_state_file(m)
+                    try:
+                        urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/{m}", timeout=1.0).close()
+                    except Exception:
+                        pass
             else:
                 try:
                     import webbrowser
@@ -641,24 +595,15 @@ def run():
         except Exception:
             pass
 
-        # Server is not running yet -> write state files & spawn detached daemon with closed stdio handles
         podman_manager.write_state_file()
-        if start_plex_flag:
-            podman_manager.write_plex_state_file()
-        if start_downloads_flag:
-            podman_manager.write_downloads_state_file()
-        if start_music_flag:
-            podman_manager.write_music_state_file()
+        for m in start_modes:
+            podman_manager.write_mode_state_file(m)
         pythonw_exe = os.path.join(os.path.dirname(sys.executable), 'pythonw.exe')
         if not os.path.exists(pythonw_exe):
             pythonw_exe = sys.executable
         cmd = [pythonw_exe, os.path.abspath(__file__), '--daemon']
-        if start_plex_flag:
-            cmd.append('--start-plex')
-        if start_downloads_flag:
-            cmd.append('--start-downloads')
-        if start_music_flag:
-            cmd.append('--start-music')
+        for m in start_modes:
+            cmd.append(f'--start-{m}')
         DETACHED_PROCESS = 0x00000008
         CREATE_NEW_PROCESS_GROUP = 0x00000200
         subprocess.Popen(
@@ -677,27 +622,14 @@ def run():
         httpd = AppHTTPServer(server_address, AppHandler)
     except OSError:
         print(f"[i] PodMedia is already running on http://localhost:{PORT}")
-        if start_plex_flag:
-            podman_manager.write_plex_state_file()
-            try:
-                import urllib.request
-                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/plex", timeout=1.0)
-            except Exception:
-                pass
-        elif start_downloads_flag:
-            podman_manager.write_downloads_state_file()
-            try:
-                import urllib.request
-                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/downloads", timeout=1.0)
-            except Exception:
-                pass
-        elif start_music_flag:
-            podman_manager.write_music_state_file()
-            try:
-                import urllib.request
-                urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/music", timeout=1.0)
-            except Exception:
-                pass
+        if start_modes:
+            import urllib.request
+            for m in start_modes:
+                podman_manager.write_mode_state_file(m)
+                try:
+                    urllib.request.urlopen(f"http://127.0.0.1:{PORT}/api/autostart/{m}", timeout=1.0).close()
+                except Exception:
+                    pass
         else:
             try:
                 import webbrowser
@@ -706,60 +638,39 @@ def run():
                 pass
         os._exit(0)
 
-    # Register exit cleanup ONLY for the primary server instance & write root state file
     atexit.register(podman_manager.stop_all_containers_sync)
     podman_manager.write_state_file()
-    if start_plex_flag:
-        podman_manager.write_plex_state_file()
-    if start_downloads_flag:
-        podman_manager.write_downloads_state_file()
-    if start_music_flag:
-        podman_manager.write_music_state_file()
+    for m in start_modes:
+        podman_manager.write_mode_state_file(m)
 
-    # Start HTTP server thread IMMEDIATELY so /api/ping responds within milliseconds
     server_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
     server_thread.start()
 
     def _startup_init():
         global is_busy
-        any_start = start_plex_flag or start_downloads_flag or start_music_flag
-        if any_start:
-            is_busy = True
+        if not start_modes:
+            return
+        is_busy = True
         try:
-            # Wake external drives only when policy allows & a mode requiring external archive is starting
-            wake_policy = podman_manager.get_disk_wake_policy()
-            needs_disk = start_plex_flag or start_downloads_flag or (start_music_flag and podman_manager.get_music_start_plex())
-            if wake_policy == 'always' or (wake_policy == 'media_only' and needs_disk):
-                disk_manager.wake_all_external_drives()
-            if start_plex_flag:
-                for _ in get_action_generator('start-group', 'plex'):
-                    pass
-            if start_downloads_flag:
-                for _ in get_action_generator('start-group', 'downloads'):
-                    pass
-            if start_music_flag:
-                for _ in get_action_generator('start-group', 'music'):
-                    pass
+            for _ in podman_manager.reconcile_modes(set(start_modes)):
+                pass
         except Exception as e:
             print("Startup initialization error:", e)
         finally:
-            if any_start:
-                is_busy = False
+            is_busy = False
 
     threading.Thread(target=_startup_init, daemon=True).start()
 
-    # Start granular media folder watcher for Plex section refreshes (movies, series, music)
     import media_watcher
     media_dir = os.path.abspath(os.path.join(podman_manager.project_root, podman_manager.MEDIA_DIR)) if not os.path.isabs(podman_manager.MEDIA_DIR) else podman_manager.MEDIA_DIR
     media_watcher.start_media_watcher(media_dir)
 
-    # Start automated background container updater (keeps running containers on latest images)
     import auto_updater
     auto_updater.start_auto_updater()
 
-    print(f"==================================================")
+    print("==================================================")
     print(f" PodMedia running at http://localhost:{PORT}")
-    print(f"==================================================")
+    print("==================================================")
 
     try:
         import tray
@@ -768,6 +679,7 @@ def run():
     except Exception as e:
         print("Running in headless console mode (System Tray disabled):", e)
         server_thread.join()
+
 
 if __name__ == '__main__':
     run()

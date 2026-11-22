@@ -310,7 +310,7 @@ def get_settings():
         "auto_update_enabled": cfg.getboolean("automation", "auto_update_enabled", fallback=True),
         "watched_media_action": cfg.get("automation", "watched_media_action", fallback="keep"),
         "disk_wake_policy": cfg.get("automation", "disk_wake_policy", fallback="media_only"),
-        "music_start_plex": cfg.getboolean("automation", "music_start_plex", fallback=False),
+        "music_start_slskd": cfg.getboolean("automation", "music_start_slskd", fallback=True),
         "slskd_available": slskd_cfg["available"],
         "slskd_username": slskd_cfg["username"],
         "slskd_listen_port": slskd_cfg["listen_port"],
@@ -353,7 +353,7 @@ def save_settings(payload):
     disk_wake = str(payload.get("disk_wake_policy", "media_only")).strip().lower()
     if disk_wake not in ("media_only", "manual", "always"):
         disk_wake = "media_only"
-    music_start_plex = bool(payload.get("music_start_plex", False))
+    music_start_slskd = bool(payload.get("music_start_slskd", True))
 
     cfg.set("server", "port", str(port))
     if not cfg.has_option("paths", "media_dir"):
@@ -366,7 +366,7 @@ def save_settings(payload):
     cfg.set("automation", "auto_update_enabled", "true" if auto_update else "false")
     cfg.set("automation", "watched_media_action", watched_action)
     cfg.set("automation", "disk_wake_policy", disk_wake)
-    cfg.set("automation", "music_start_plex", "true" if music_start_plex else "false")
+    cfg.set("automation", "music_start_slskd", "true" if music_start_slskd else "false")
 
     with open(CONFIG_PROPERTIES_PATH, "w", encoding="utf-8") as f:
         cfg.write(f)
@@ -374,7 +374,7 @@ def save_settings(payload):
     if port != old_port:
         restart_targets.append("podmedia")
 
-    # Apply live Watchlist interval & watched-media policy immediately
+    # Apply live Watchlist interval, watched-media policy & disk sleep policy immediately
     try:
         import media_watcher
         if media_watcher.watcher_instance:
@@ -382,6 +382,12 @@ def save_settings(payload):
             media_watcher.watcher_instance.watched_media_action = watched_action
     except Exception:
         pass
+    if disk_wake in ("media_only", "manual"):
+        try:
+            if not podman_manager.get_containers_using_external_disk():
+                podman_manager.release_external_mounts(power_down=True)
+        except Exception:
+            pass
 
     # Apply live qBittorrent speed limits
     if "dl_limit_mbps" in payload or "up_limit_kbps" in payload:
@@ -455,7 +461,7 @@ def reset_to_defaults():
         "auto_update_enabled": True,
         "watched_media_action": "keep",
         "disk_wake_policy": "media_only",
-        "music_start_plex": False,
+        "music_start_slskd": True,
         "slskd_listen_port": 50300,
         "slskd_share_music": True,
         "dl_limit_mbps": 0,

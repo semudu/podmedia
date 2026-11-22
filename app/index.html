@@ -1247,22 +1247,22 @@
 
         <!-- 1. THREE CORE MEDIA MODES -->
         <div class="grid-3">
-            <!-- Cinema & Watch -->
-            <div class="hub-card" id="mode-card-plex">
+            <!-- Video & Cinema -->
+            <div class="hub-card" id="mode-card-video">
                 <div class="hub-card-body">
                     <div class="hub-card-top">
                         <div class="icon-box">🎬</div>
                         <label class="switch">
-                            <input type="checkbox" id="group-plex-toggle" onchange="triggerAction('toggle-group', 'plex')">
+                            <input type="checkbox" id="group-video-toggle" onchange="triggerAction('toggle-group', 'video')">
                             <span class="slider"></span>
                         </label>
                     </div>
                     <div>
-                        <div class="hub-title" data-i18n="modeStream">Sinema & İzleme</div>
-                        <div class="hub-desc" data-i18n="modeStreamDesc">Film ve dizilerini TV, telefon veya tarayıcıdan izle.</div>
+                        <div class="hub-title" data-i18n="modeStream">Film & Dizi (Sinema)</div>
+                        <div class="hub-desc" data-i18n="modeStreamDesc">Harici arşiv diskiyle tüm film ve dizilerini TV, telefon veya tarayıcıdan izle.</div>
                     </div>
                     <div class="hub-meta-line">
-                        <span class="badge off" id="group-plex-badge"><span class="status-dot"></span><span id="group-plex-text">...</span></span>
+                        <span class="badge off" id="group-video-badge"><span class="status-dot"></span><span id="group-video-text">...</span></span>
                         <span class="hub-stat" id="overview-plex-stat"></span>
                     </div>
                 </div>
@@ -1757,9 +1757,9 @@
                         </label>
                     </div>
                     <div class="field-toggle">
-                        <span data-i18n="lblMusicStartPlex">Müzik Modunda Plex'i de Başlat</span>
+                        <span data-i18n="lblMusicStartSlskd">Müzik Modunda Slskd'yi (FLAC) de Başlat</span>
                         <label class="switch sm">
-                            <input type="checkbox" id="set-music-start-plex">
+                            <input type="checkbox" id="set-music-start-slskd" checked>
                             <span class="slider"></span>
                         </label>
                     </div>
@@ -1918,12 +1918,12 @@
                 diskSleepBtn: '🌙 Diski Uyut',
                 diskWakeBtn: '⚡ Diski Uyandır',
                 diskSleepNeedStop: 'Diski uyutmak için önce tüm servisleri durdurun (Durdur).',
-                modeStream: 'Sinema & İzleme',
-                modeStreamDesc: 'Film ve dizilerini TV, telefon veya tarayıcıdan izle.',
+                modeStream: 'Film & Dizi (Sinema)',
+                modeStreamDesc: 'Harici arşiv diskiyle tüm film ve dizilerini TV, telefon veya tarayıcıdan izle.',
                 modeDownload: 'Kütüphane & İndirme',
                 modeDownloadDesc: 'İzleme listendeki film ve dizileri otomatik bulup indirir.',
-                modeMusic: 'Müzik Arşivi',
-                modeMusicDesc: 'Plexamp dinlemelerine göre müzik keşfet, parça veya albüm indir ve arşivle.',
+                modeMusic: 'Müzik & Plexamp',
+                modeMusicDesc: 'Harici diski uyandırmadan Plexamp ile dinle, Aurral & Slskd ile keşfet ve FLAC indir.',
                 openPlayer: 'Oynatıcıyı Aç ↗',
                 openLibrary: 'Kütüphaneyi Aç →',
                 openMusicHub: 'Müzik Keşfet ↗',
@@ -1963,7 +1963,8 @@
                 lblSlskdUser: 'Soulseek (Slskd) Kullanıcı Adı',
                 lblSlskdPort: 'Slskd Dinleme Portu',
                 lblSlskdShare: 'Slskd Müzik Paylaşımı (/music)',
-                lblMusicStartPlex: "Müzik Modunda Plex'i de Başlat",
+                lblMusicStartSlskd: "Müzik Modunda Slskd'yi (FLAC) de Başlat",
+                plexMusicStubSub: 'Aktif (Müzik / Plexamp · Disk Uykuda)',
                 lblDiskWakePolicy: 'Harici Disk Uyandırma Politikası',
                 optWakeMediaOnly: 'Yalnızca Film/Dizi servisleri başlarken (Önerilen)',
                 optWakeManual: 'Yalnızca manuel uyandır (Müzik/Plexamp 0 RPM)',
@@ -2069,12 +2070,12 @@
                 diskSleepBtn: '🌙 Sleep Disk',
                 diskWakeBtn: '⚡ Wake Disk',
                 diskSleepNeedStop: 'Stop all running services before sleeping the external drive.',
-                modeStream: 'Cinema & Watch',
-                modeStreamDesc: 'Stream your movies and shows on TV, mobile, or web.',
+                modeStream: 'Video & Cinema',
+                modeStreamDesc: 'Stream your full movie & TV archive on TV, mobile, or web with external disk awake.',
                 modeDownload: 'Library & Downloads',
                 modeDownloadDesc: 'Automatically finds and downloads titles from your watchlist.',
-                modeMusic: 'Music Library',
-                modeMusicDesc: 'Discover music from Plexamp listens, download tracks or full albums, and organize.',
+                modeMusic: 'Music & Plexamp',
+                modeMusicDesc: 'Listen via Plexamp with external disk asleep, discover & download FLAC via Aurral & Slskd.',
                 openPlayer: 'Open Player ↗',
                 openLibrary: 'Open Library →',
                 openMusicHub: 'Discover Music ↗',
@@ -2114,7 +2115,8 @@
                 lblSlskdUser: 'Soulseek (Slskd) Username',
                 lblSlskdPort: 'Slskd Listen Port',
                 lblSlskdShare: 'Share Music Folder (/music) on Slskd',
-                lblMusicStartPlex: 'Also Start Plex with Music Mode',
+                lblMusicStartSlskd: 'Also Start Slskd (FLAC) with Music Mode',
+                plexMusicStubSub: 'Active (Music / Plexamp · Disk Asleep)',
                 lblDiskWakePolicy: 'External Disk Wake Policy',
                 optWakeMediaOnly: 'Only when Movie/TV services start (Recommended)',
                 optWakeManual: 'Manual wake only (0 RPM during Music/Plexamp)',
@@ -2330,7 +2332,7 @@
 
             document.querySelectorAll('.hub-card input[type="checkbox"], .service-row input[type="checkbox"]').forEach(i => i.disabled = isSystemBusy);
 
-            updateModeCard('plex', groups.plex);
+            updateModeCard('video', groups.video);
             updateModeCard('downloads', groups.downloads);
             updateModeCard('music', groups.music);
 
@@ -2357,7 +2359,8 @@
                 containers.media_center_slskd
             ]);
 
-            updateServiceRow('plex', containers.media_center_plex);
+            const plexStubSub = (containers.media_center_plex && data.plex_disk_mode === 'stub') ? t('plexMusicStubSub') : null;
+            updateServiceRow('plex', containers.media_center_plex, plexStubSub);
             updateServiceRow('plextraktsync', containers.media_center_plextraktsync, isTraktReady ? null : t('traktNotConfigured'));
             updateServiceRow('radarr', containers.media_center_radarr);
             updateServiceRow('sonarr', containers.media_center_sonarr);
@@ -3132,7 +3135,7 @@
             document.getElementById('set-tz').value = s.timezone ?? 'Europe/Istanbul';
             document.getElementById('set-auto-update').checked = !!s.auto_update_enabled;
             document.getElementById('set-disk-wake-policy').value = s.disk_wake_policy ?? 'media_only';
-            document.getElementById('set-music-start-plex').checked = !!s.music_start_plex;
+            document.getElementById('set-music-start-slskd').checked = s.music_start_slskd !== false;
 
             const showSlskd = s.slskd_available !== false;
             document.getElementById('slskd-user-field').style.display = showSlskd ? 'flex' : 'none';
@@ -3209,7 +3212,7 @@
                     timezone: document.getElementById('set-tz').value.trim(),
                     auto_update_enabled: document.getElementById('set-auto-update').checked,
                     disk_wake_policy: document.getElementById('set-disk-wake-policy').value,
-                    music_start_plex: document.getElementById('set-music-start-plex').checked,
+                    music_start_slskd: document.getElementById('set-music-start-slskd').checked,
                     slskd_username: document.getElementById('set-slskd-user').value.trim(),
                     slskd_listen_port: parseInt(document.getElementById('set-slskd-port').value, 10) || 50300,
                     slskd_share_music: document.getElementById('set-slskd-share').checked,

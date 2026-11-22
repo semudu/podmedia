@@ -17,9 +17,10 @@
 *.yaml
 !services/**/podman-compose.yml
 
-# Local environment & properties files
+# Local environment, runtime state/PIDs & properties files
 config.properties
 disk_config.json
+/run/
 *.running
 media_external_stub/
 .env
@@ -27,21 +28,15 @@ media_external_stub/
 **/.env.local
 !**/.env.example
 
-# Dynamically generated OS Launchers & Stoppers
+# Dynamically generated OS Launchers & Stoppers (under scripts/)
+/scripts/*.bat
+/scripts/*.sh
 start.bat
 start.sh
-start_plex.bat
-start_plex.sh
-stop_plex.bat
-stop_plex.sh
-start_downloads.bat
-start_downloads.sh
-stop_downloads.bat
-stop_downloads.sh
-start_music.bat
-start_music.sh
-stop_music.bat
-stop_music.sh
+start_*.bat
+start_*.sh
+stop_*.bat
+stop_*.sh
 stop.bat
 stop.sh
 status.bat

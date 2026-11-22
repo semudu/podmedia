@@ -250,11 +250,10 @@ class MediaWatcher(threading.Thread):
                 if self.watched_media_action in ("delete_after_rating", "delete_after_24h", "delete_immediate"):
                     threading.Thread(target=cleanup_watched_media, args=(self.watched_media_action,), daemon=True).start()
 
-            # Dynamically update external disk paths (only when external-disk containers are active)
+            # Dynamically update external disk paths (only when a container actually mounts the external disk)
             try:
                 import podman_manager
-                c_states, _ = podman_manager.get_container_states()
-                ext_svcs_active = any(c_states.get(c, False) for c in podman_manager.EXTERNAL_DISK_CONTAINERS)
+                ext_svcs_active = bool(podman_manager.get_containers_using_external_disk())
                 active_disk = disk_manager.get_active_disk() if ext_svcs_active else None
                 is_ext_connected = bool(active_disk and active_disk.get('connected'))
                 if is_ext_connected:

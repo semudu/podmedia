@@ -43,7 +43,7 @@ class PodMediaTrayApp:
         self.icon = None
         self._stop_poller = False
         self._state = {
-            "groups": {"plex": False, "downloads": False, "music": False},
+            "groups": {"video": False, "downloads": False, "music": False},
             "containers": {},
             "is_busy": False,
             "trakt_configured": podman_manager.is_plextraktsync_configured(),
@@ -55,7 +55,7 @@ class PodMediaTrayApp:
             with urllib.request.urlopen(req, timeout=2.5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
             new_state = {
-                "groups": data.get("groups") or {"plex": False, "downloads": False, "music": False},
+                "groups": data.get("groups") or {"video": False, "downloads": False, "music": False},
                 "containers": data.get("containers") or {},
                 "is_busy": bool(data.get("is_busy", False)),
                 "trakt_configured": bool(data.get("trakt_configured", False)),
@@ -168,9 +168,9 @@ class PodMediaTrayApp:
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(
-                "Cinema & Watch",
-                self.toggle_mode("plex"),
-                checked=lambda item: bool(self._state["groups"].get("plex", False)),
+                "Video & Cinema",
+                self.toggle_mode("video"),
+                checked=lambda item: bool(self._state["groups"].get("video", False)),
                 enabled=lambda item: not self._state["is_busy"],
             ),
             pystray.MenuItem(
