@@ -117,38 +117,21 @@ services:
       - media_center_net
     restart: unless-stopped
 
-  beets:
-    container_name: media_center_beets
-    image: lscr.io/linuxserver/beets:latest
+  aurral:
+    container_name: media_center_aurral
+    image: ghcr.io/lklynet/aurral:latest
     environment:
       - PUID=1000
       - PGID=1000
       - TZ=${TZ:-Europe/Istanbul}
+      - FILE_BROWSE_ROOTS=/media/music,/downloads
+      - LIBRARY_FOLDER=/media/music
     volumes:
-      - ./beets/config:/config:Z
-      - ${MEDIA_DIR:-../../media}/music:/music:Z
+      - ./aurral/config:/config:Z
+      - ${MEDIA_DIR:-../../media}/music:/media/music:Z
       - ${DOWNLOADS_DIR:-../../downloads}:/downloads:Z
-    networks:
-      - media_center_net
-    restart: unless-stopped
-
-  metube:
-    container_name: media_center_metube
-    image: ghcr.io/alexta69/metube:latest
-    environment:
-      - PUID=1000
-      - PGID=1000
-      - TZ=${TZ:-Europe/Istanbul}
-      - DOWNLOAD_DIR=/downloads
-      - AUDIO_ONLY=true
-      - YTDL_AUTO_UPDATE=true
-      - COOKIES_FILE=/app/cookies/cookies.txt
-      - OUTPUT_TEMPLATE=%(artist,uploader)s - %(title)s.%(ext)s
-    volumes:
-      - ${DOWNLOADS_DIR:-../../downloads}/music/complete:/downloads:Z
-      - ./metube:/app/cookies:Z
     ports:
-      - "8081:8081"
+      - "3001:3001"
     networks:
       - media_center_net
     restart: unless-stopped

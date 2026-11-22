@@ -11,6 +11,198 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 _trakt_cache = {"ts": 0, "data": None}
 _summary_cache = {"ts": 0, "data": None}
+_music_cache = {"ts": 0, "data": None}
+_music_eco_cache = {"ts": 0, "data": None}
+AUDIO_EXTS = {".flac", ".mp3", ".m4a", ".opus", ".ogg", ".wav", ".aac", ".alac", ".aiff", ".wma"}
+AURRAL_DB_PATH = os.path.join(PROJECT_ROOT, "services", "tools", "aurral", "config", "aurral.db")
+
+
+def _open_aurral_ro():
+    if not os.path.exists(AURRAL_DB_PATH):
+        return None
+    import sqlite3
+    uri = "file:" + urllib.parse.quote(AURRAL_DB_PATH.replace("\\", "/"), safe="/:") + "?mode=ro"
+    return sqlite3.connect(uri, uri=True, timeout=1.5)
+
+
+def _get_music_ecosystem(aurral_running):
+    now = time.time()
+    if _music_eco_cache["data"] is not None and (now - _music_eco_cache["ts"] < 20):
+        cached = dict(_music_eco_cache["data"])
+        cached["online"] = bool(aurral_running)
+        return cached
+
+    info = {
+        "connected": False,
+        "online": bool(aurral_running),
+        "listenbrainz_user": "",
+        "plex_synced": False,
+        "plex_user": "",
+        "plex_send_playlists": False,
+        "lastfm_imported": False,
+        "flows_count": 0,
+        "playlists_count": 0,
+        "slskd_enabled": False,
+    }
+    con = None
+    try:
+        con = _open_aurral_ro()
+        if con is not None:
+            cur = con.cursor()
+            # ListenBrainz / history sources
+            try:
+                for prov, acc in cur.execute("SELECT provider, account FROM listen_history_sources").fetchall():
+                    if str(prov or "").lower() == "listenbrainz" and acc:
+                        info["listenbrainz_user"] = str(acc)
+            except Exception:
+                pass
+            # Plex history server
+            try:
+                for prov, uname, last_err in cur.execute("SELECT provider, username, last_error FROM history_servers").fetchall():
+                    if str(prov or "").lower() == "plex":
+                        info["plex_synced"] = not bool(last_err)
+                        info["plex_user"] = str(uname or "")
+            except Exception:
+                pass
+            # Settings JSONs (plexServer, staticPlaylists, integrations)
+            try:
+                rows = dict(cur.execute(
+                    "SELECT key, value FROM settings WHERE key IN ('plexServer','staticPlaylists','integrations')"
+                ).fetchall())
+                if rows.get("plexServer"):
+                    ps = json.loads(rows["plexServer"])
+                    info["plex_send_playlists"] = bool(ps.get("sendPlaylists"))
+                    if ps.get("url") and not info["plex_synced"]:
+                        info["plex_synced"] = True
+                if rows.get("staticPlaylists"):
+                    sp = json.loads(rows["staticPlaylists"])
+                    if isinstance(sp, list):
+                        info["playlists_count"] = len(sp)
+                        info["lastfm_imported"] = any(str(p.get("sourceName", "")).lower() == "last.fm" for p in sp if isinstance(p, dict))
+                if rows.get("integrations"):
+                    integ = json.loads(rows["integrations"])
+                    info["slskd_enabled"] = bool((integ.get("slskd") or {}).get("enabled"))
+            except Exception:
+                pass
+            # Flows count
+            try:
+                info["flows_count"] = int(cur.execute("SELECT COUNT(*) FROM discovery_playlists").fetchone()[0] or 0)
+            except Exception:
+                pass
+            info["connected"] = bool(
+                info["listenbrainz_user"] or info["plex_synced"] or info["lastfm_imported"] or info["flows_count"] > 0
+            )
+    except Exception:
+        pass
+    finally:
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass
+
+    _music_eco_cache["ts"] = now
+    _music_eco_cache["data"] = dict(info)
+    return info
+
+
+def _get_music_summary():
+    now = time.time()
+    if _music_cache["data"] is not None and (now - _music_cache["ts"] < 45):
+        return _music_cache["data"]
+
+    artists = 0
+    albums = 0
+    tracks = 0
+    flac_tracks = 0
+    total_bytes = 0
+    jobs_active = 0
+    jobs_failed = 0
+    loaded_from_db = False
+
+    con = None
+    try:
+        con = _open_aurral_ro()
+        if con is not None:
+            cur = con.cursor()
+            row = cur.execute(
+                "SELECT COUNT(*), COALESCE(SUM(size), 0), "
+                "COALESCE(SUM(CASE WHEN LOWER(format)='flac' THEN 1 ELSE 0 END), 0), "
+                "COUNT(DISTINCT album_id) "
+                "FROM library_media_files WHERE available = 1"
+            ).fetchone()
+            if row and int(row[0] or 0) > 0:
+                tracks = int(row[0] or 0)
+                total_bytes = int(row[1] or 0)
+                flac_tracks = int(row[2] or 0)
+                albums = int(row[3] or 0)
+                artists = int(cur.execute("SELECT COUNT(*) FROM library_artists").fetchone()[0] or 0)
+                loaded_from_db = True
+            try:
+                for st, cnt in cur.execute("SELECT status, COUNT(*) FROM download_jobs GROUP BY status").fetchall():
+                    s_low = str(st or "").lower()
+                    if s_low in ("queued", "pending", "downloading", "searching", "processing"):
+                        jobs_active += int(cnt or 0)
+                    elif s_low == "failed":
+                        jobs_failed += int(cnt or 0)
+            except Exception:
+                pass
+    except Exception:
+        pass
+    finally:
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass
+
+    if not loaded_from_db:
+        media_root = (
+            os.path.abspath(os.path.join(PROJECT_ROOT, podman_manager.MEDIA_DIR))
+            if not os.path.isabs(podman_manager.MEDIA_DIR)
+            else podman_manager.MEDIA_DIR
+        )
+        music_dir = os.path.join(media_root, "music")
+        album_dirs = set()
+        if os.path.exists(music_dir):
+            try:
+                for entry in os.scandir(music_dir):
+                    if entry.is_dir() and not entry.name.startswith((".", "_")):
+                        artists += 1
+                for root, dirs, files in os.walk(music_dir):
+                    dirs[:] = [d for d in dirs if not d.startswith((".", "_"))]
+                    for f in files:
+                        ext = os.path.splitext(f)[1].lower()
+                        if ext in AUDIO_EXTS:
+                            tracks += 1
+                            album_dirs.add(root)
+                            if ext == ".flac":
+                                flac_tracks += 1
+                            try:
+                                total_bytes += os.path.getsize(os.path.join(root, f))
+                            except Exception:
+                                pass
+                albums = len(album_dirs)
+            except Exception:
+                pass
+
+    lossy_tracks = max(0, tracks - flac_tracks)
+    flac_pct = int(round((flac_tracks / tracks) * 100)) if tracks > 0 else 0
+
+    data = {
+        "artists": artists,
+        "albums": albums,
+        "tracks": tracks,
+        "flac_tracks": flac_tracks,
+        "lossy_tracks": lossy_tracks,
+        "flac_pct": flac_pct,
+        "size_gb": round(total_bytes / (1024 ** 3), 1),
+        "jobs_active": jobs_active,
+        "jobs_failed": jobs_failed,
+    }
+    _music_cache["ts"] = now
+    _music_cache["data"] = data
+    return data
 
 
 def _get_plex_integration(plex_running):
@@ -217,6 +409,7 @@ def get_hub_summary(force=False):
     containers, _ = podman_manager.get_container_states()
     plex_int = _get_plex_integration(containers.get("media_center_plex", False))
     trakt_int = _get_trakt_integration(containers.get("media_center_plextraktsync", False))
+    music_int = _get_music_ecosystem(containers.get("media_center_aurral", False))
     downloads = _get_qbittorrent_downloads() if containers.get("media_center_qbittorrent") else {"online": False, "active_count": 0, "total_count": 0, "items": []}
     radarr = _get_radarr_library() if containers.get("media_center_radarr") else {"online": False, "total": 0, "downloaded": 0, "missing": 0, "items": []}
     sonarr = _get_sonarr_library() if containers.get("media_center_sonarr") else {"online": False, "total": 0, "downloaded": 0, "missing": 0, "items": []}
@@ -228,6 +421,7 @@ def get_hub_summary(force=False):
         "integrations": {
             "plex": plex_int,
             "trakt": trakt_int,
+            "music": music_int,
         },
         "library": {
             "radarr_online": radarr["online"],
@@ -240,6 +434,7 @@ def get_hub_summary(force=False):
             "shows_missing": sonarr["missing"],
             "items": combined_items[:120],
         },
+        "music": _get_music_summary(),
         "downloads": downloads,
     }
     _summary_cache["ts"] = now

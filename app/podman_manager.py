@@ -27,9 +27,8 @@ ALL_CONTAINERS = [
     'media_center_prowlarr',
     'media_center_qbittorrent',
     'media_center_flaresolverr',
-    'media_center_slskd',
-    'media_center_beets',
-    'media_center_metube'
+    'media_center_aurral',
+    'media_center_slskd'
 ]
 
 TOOL_MAP = {
@@ -39,10 +38,39 @@ TOOL_MAP = {
     'media_center_prowlarr': 'prowlarr',
     'media_center_qbittorrent': 'qbittorrent',
     'media_center_flaresolverr': 'flaresolverr',
-    'media_center_slskd': 'slskd',
-    'media_center_beets': 'beets',
-    'media_center_metube': 'metube'
+    'media_center_aurral': 'aurral',
+    'media_center_slskd': 'slskd'
 }
+
+EXTERNAL_DISK_CONTAINERS = {
+    'media_center_plex',
+    'media_center_radarr',
+    'media_center_sonarr',
+}
+
+def get_disk_wake_policy():
+    """Returns 'media_only' (default), 'manual', or 'always' from config.properties."""
+    try:
+        cfg = configparser.ConfigParser()
+        if os.path.exists(config_file):
+            cfg.read(config_file, encoding='utf-8')
+            val = cfg.get('automation', 'disk_wake_policy', fallback='media_only').strip().lower()
+            if val in ('media_only', 'manual', 'always'):
+                return val
+    except Exception:
+        pass
+    return 'media_only'
+
+def get_music_start_plex():
+    """Returns True if Music Mode should also auto-start Plex (default False to keep external HDD asleep)."""
+    try:
+        cfg = configparser.ConfigParser()
+        if os.path.exists(config_file):
+            cfg.read(config_file, encoding='utf-8')
+            return cfg.getboolean('automation', 'music_start_plex', fallback=False)
+    except Exception:
+        pass
+    return False
 
 def is_plextraktsync_configured():
     """Returns True if PlexTraktSync has completed initial Plex & Trakt login."""
@@ -231,16 +259,17 @@ def get_container_states():
     groups = {
         "plex": states['media_center_plex'],
         "downloads": (states['media_center_radarr'] and states['media_center_sonarr'] and states['media_center_qbittorrent']),
-        "music": (states['media_center_slskd'] and states['media_center_plex'])
+        "music": (states['media_center_aurral'] or states['media_center_slskd'])
     }
     return states, groups
 
-def ensure_external_mounts():
-    """Ensures that if an external disk is connected, it is woken up, brought online, and mounted inside Podman's VM namespace.
-    If no external disk is connected (unplugged or never configured), ensures local stub fallback is used and recreates
-    any containers that still hold a stale mount reference to a disconnected external drive."""
+def ensure_external_mounts(allow_wake=True):
+    """Ensures that if an external disk is connected, it is woken up (unless disk_wake_policy='manual'),
+    brought online, and mounted inside Podman's VM namespace.
+    If no external disk is connected (unplugged, sleeping, or never configured), uses local stub fallback."""
     try:
-        if os.name == 'nt':
+        policy = get_disk_wake_policy()
+        if os.name == 'nt' and allow_wake and policy != 'manual':
             disk_manager.wake_all_external_drives()
 
         active = disk_manager.get_active_disk()
@@ -286,7 +315,8 @@ def apply_target_state(target_containers):
     """Main engine to start target containers and stop unneeded ones with live logging."""
     for log in ensure_podman_machine():
         yield log
-    if target_containers:
+    target_set_preview = set(target_containers or [])
+    if target_set_preview & EXTERNAL_DISK_CONTAINERS:
         for log in ensure_external_mounts():
             yield log
     for log in ensure_network():
@@ -352,6 +382,11 @@ def apply_target_state(target_containers):
     else:
         remove_downloads_state_file()
 
+    if 'media_center_aurral' in target_containers or 'media_center_slskd' in target_containers:
+        write_music_state_file()
+    else:
+        remove_music_state_file()
+
     for log in release_external_mounts_with_logs():
         yield log
     yield "\n[✓] ACTION COMPLETED SUCCESSFULLY!\n"
@@ -361,10 +396,12 @@ def release_external_mounts_with_logs(power_down=False):
     try:
         machine_running = is_podman_machine_running()
         if machine_running:
-            res = subprocess.run(['podman', 'ps', '-q', '--filter', 'name=media_center_'], capture_output=True, text=True, **subproc_kwargs())
-            if res.returncode == 0 and res.stdout.strip():
-                # Containers are still running; do not unmount
-                return
+            res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
+            if res.returncode == 0:
+                running_names = {c.strip() for c in res.stdout.strip().splitlines() if c.strip()}
+                if running_names & EXTERNAL_DISK_CONTAINERS:
+                    # External-disk containers (Plex/Radarr/Sonarr) are still running; do not unmount
+                    return
 
         letters = set()
         active_disk = disk_manager.get_active_disk()
@@ -410,6 +447,7 @@ def release_external_mounts(power_down=False):
 STATE_FILE = os.path.join(project_root, 'podmedia.running')
 PLEX_STATE_FILE = os.path.join(project_root, 'plex.running')
 DOWNLOADS_STATE_FILE = os.path.join(project_root, 'downloads.running')
+MUSIC_STATE_FILE = os.path.join(project_root, 'music.running')
 
 def write_state_file():
     """Creates the podmedia.running state file in the project root."""
@@ -459,11 +497,28 @@ def remove_downloads_state_file():
     except Exception:
         pass
 
+def write_music_state_file():
+    """Creates the music.running state file in the project root."""
+    try:
+        with open(MUSIC_STATE_FILE, 'w', encoding='utf-8') as f:
+            json.dump({"status": "running", "group": "music"}, f)
+    except Exception:
+        pass
+
+def remove_music_state_file():
+    """Removes the music.running state file from the project root."""
+    try:
+        if os.path.exists(MUSIC_STATE_FILE):
+            os.remove(MUSIC_STATE_FILE)
+    except Exception:
+        pass
+
 def stop_all_containers_sync(power_down=True):
     """Synchronously stops all running PodMedia containers and powers down external disks (used on application exit)."""
     remove_state_file()
     remove_plex_state_file()
     remove_downloads_state_file()
+    remove_music_state_file()
     try:
         if is_podman_machine_running():
             res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
@@ -479,6 +534,7 @@ def stop_all_containers(power_down=False):
     """Stops all running PodMedia containers."""
     remove_plex_state_file()
     remove_downloads_state_file()
+    remove_music_state_file()
     if is_podman_machine_running():
         yield "[!] Stopping all PodMedia services...\n"
         res = subprocess.run(['podman', 'ps', '--filter', 'name=media_center_', '--format', '{{.Names}}'], capture_output=True, text=True, **subproc_kwargs())
@@ -496,68 +552,13 @@ def stop_all_containers(power_down=False):
         yield log
     yield "\n[✓] ALL SERVICES STOPPED (External disk released)!\n"
 
-def cleanup_empty_dirs(target_dir):
-    """Recursively removes empty folders in target_dir."""
-    if not os.path.exists(target_dir):
-        return 0
-    removed_count = 0
-    for root, dirs, files in os.walk(target_dir, topdown=False):
-        for d in dirs:
-            dir_path = os.path.join(root, d)
-            try:
-                if not os.listdir(dir_path):
-                    os.rmdir(dir_path)
-                    removed_count += 1
-            except Exception:
-                pass
-    return removed_count
-
-def organize_music():
-    """Triggers Beets music auto-tagging process from /downloads/music/complete -> /music."""
-    for log in ensure_podman_machine():
-        yield log
-
-    states, _ = get_container_states()
-    if not states.get('media_center_beets', False):
-        yield "[+] Starting Beets service...\n"
-        tools_dir = os.path.join(project_root, 'services', 'tools')
-        for log in run_command_generator('podman-compose up -d beets', cwd=tools_dir):
-            yield log
-
-    yield "[+] Triggering Beets music tagging automation (/downloads/music/complete -> /music)...\n"
-    for log in run_command_generator('podman exec media_center_beets beet import -m -q /downloads/music/complete'):
-        yield log
-    # Singleton pass for individual songs
-    for log in run_command_generator('podman exec media_center_beets beet import -m -s -q /downloads/music/complete'):
-        yield log
-    # Fallback pass for non-standard folder names or unindexed releases
-    for log in run_command_generator('podman exec media_center_beets beet import -m -A -q /downloads/music/complete'):
-        yield log
-
-    complete_dir = os.path.abspath(os.path.join(project_root, DOWNLOADS_DIR, "music", "complete")) if not os.path.isabs(DOWNLOADS_DIR) else os.path.join(DOWNLOADS_DIR, "music", "complete")
-    incomplete_dir = os.path.abspath(os.path.join(project_root, DOWNLOADS_DIR, "music", "incomplete")) if not os.path.isabs(DOWNLOADS_DIR) else os.path.join(DOWNLOADS_DIR, "music", "incomplete")
-    cleaned_c = cleanup_empty_dirs(complete_dir)
-    cleaned_i = cleanup_empty_dirs(incomplete_dir)
-    total_cleaned = cleaned_c + cleaned_i
-    if total_cleaned > 0:
-        yield f"[✓] Cleaned up {total_cleaned} empty leftover user folder(s).\n"
-
-    # Trigger Plex library refresh if Plex is running
-    try:
-        req = urllib.request.Request("http://localhost:32400/library/sections/all/refresh")
-        urllib.request.urlopen(req, timeout=2)
-        yield "[✓] Triggered automatic Plex Media Library scan.\n"
-    except Exception:
-        pass
-
-    yield "\n[✓] MUSIC TAGGING COMPLETED!\n"
-
 def start_single_app(app_name):
     """Selectively starts a single application container."""
     for log in ensure_podman_machine():
         yield log
-    for log in ensure_external_mounts():
-        yield log
+    if f"media_center_{app_name}" in EXTERNAL_DISK_CONTAINERS:
+        for log in ensure_external_mounts():
+            yield log
     for log in ensure_network():
         yield log
 
@@ -569,9 +570,8 @@ def start_single_app(app_name):
         'prowlarr': ('tools', 'prowlarr'),
         'qbittorrent': ('tools', 'qbittorrent'),
         'flaresolverr': ('tools', 'flaresolverr'),
-        'slskd': ('tools', 'slskd'),
-        'beets': ('tools', 'beets'),
-        'metube': ('tools', 'metube')
+        'aurral': ('tools', 'aurral'),
+        'slskd': ('tools', 'slskd')
     }
 
     if app_name in app_map:

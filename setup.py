@@ -81,13 +81,6 @@ def run_setup():
         "Slskd Downloader (services/tools/slskd/config/slskd.yml)"
     )
 
-    # Beets Config (Music Auto-Tagger)
-    copy_template_if_missing(
-        os.path.join(base_dir, "services", "tools", "beets", "config.yaml.example"),
-        os.path.join(base_dir, "services", "tools", "beets", "config", "config.yaml"),
-        "Beets Music Auto-Tagger (services/tools/beets/config/config.yaml)"
-    )
-
     # qBittorrent Config (Torrent Downloader)
     copy_template_if_missing(
         os.path.join(base_dir, "services", "tools", "qbittorrent", "qBittorrent.conf.example"),
@@ -130,11 +123,11 @@ def run_setup():
         os.path.join(media_dir, "series"),
         os.path.join(media_dir, "music"),
         os.path.join(base_dir, "services", "tools", "slskd", "config"),
-        os.path.join(base_dir, "services", "tools", "beets", "config"),
         os.path.join(base_dir, "services", "tools", "qbittorrent", "config", "qBittorrent"),
         os.path.join(base_dir, "services", "tools", "sonarr", "config"),
         os.path.join(base_dir, "services", "tools", "radarr", "config"),
         os.path.join(base_dir, "services", "tools", "prowlarr", "config"),
+        os.path.join(base_dir, "services", "tools", "aurral", "config"),
         os.path.join(base_dir, "services", "tools", "plextraktsync", "config"),
     ]
 
@@ -194,10 +187,18 @@ def run_setup():
                 capture_output=True, text=True, **subproc_kwargs()
             )
             subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_StartMusic", "/TR", f'"{pythonw_exe}" "{app_py_path}" --start-music', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
+                ["schtasks", "/Create", "/TN", "PodMedia_StopMusic", "/TR", f'"{pythonw_exe}" "{app_py_path}" --stop-music', "/SC", "ONCE", "/ST", "00:00", "/F"],
+                capture_output=True, text=True, **subproc_kwargs()
+            )
+            subprocess.run(
                 ["schtasks", "/Create", "/TN", "PodMedia_Stop", "/TR", f'"{pythonw_exe}" "{app_py_path}" --stop', "/SC", "ONCE", "/ST", "00:00", "/F"],
                 capture_output=True, text=True, **subproc_kwargs()
             )
-            print(" [✓] Registered Windows Scheduled Tasks: 'PodMedia_Start', 'PodMedia_StartPlex', 'PodMedia_StopPlex', 'PodMedia_StartDownloads', 'PodMedia_StopDownloads', 'PodMedia_Stop'")
+            print(" [✓] Registered Windows Scheduled Tasks: 'PodMedia_Start', 'PodMedia_StartPlex', 'PodMedia_StopPlex', 'PodMedia_StartDownloads', 'PodMedia_StopDownloads', 'PodMedia_StartMusic', 'PodMedia_StopMusic', 'PodMedia_Stop'")
         except Exception as e:
             print(" [!] Note: Scheduled task registration skipped:", e)
 
@@ -245,7 +246,7 @@ def run_setup():
         stop_plex_bat_content = (
             "@echo off\n"
             "if exist \"%~dp0plex.running\" del /f /q \"%~dp0plex.running\" >nul 2>&1\n"
-            "if not exist \"%~dp0downloads.running\" (\n"
+            "if not exist \"%~dp0downloads.running\" if not exist \"%~dp0music.running\" (\n"
             "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
             ")\n"
             f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/plex >nul 2>&1\n"
@@ -287,7 +288,7 @@ def run_setup():
         stop_downloads_bat_content = (
             "@echo off\n"
             "if exist \"%~dp0downloads.running\" del /f /q \"%~dp0downloads.running\" >nul 2>&1\n"
-            "if not exist \"%~dp0plex.running\" (\n"
+            "if not exist \"%~dp0plex.running\" if not exist \"%~dp0music.running\" (\n"
             "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
             ")\n"
             f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/downloads >nul 2>&1\n"
@@ -305,6 +306,48 @@ def run_setup():
             f.write(stop_downloads_bat_content)
         print(" [✓] Created Windows Downloads stopper: 'stop_downloads.bat'")
 
+        music_launcher_path = os.path.join(base_dir, "start_music.bat")
+        start_music_bat_content = (
+            "@echo off\n"
+            "if not exist \"%~dp0podmedia.running\" echo {\"status\":\"starting\"} > \"%~dp0podmedia.running\"\n"
+            "if not exist \"%~dp0music.running\" echo {\"status\":\"starting\"} > \"%~dp0music.running\"\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostart/music >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_StartMusic\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_StartMusic\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\" --start-music\n"
+            ")\n"
+            "exit /b 0\n"
+        )
+        with open(music_launcher_path, "w", encoding="utf-8") as f:
+            f.write(start_music_bat_content)
+        print(" [✓] Created Windows Music launcher: 'start_music.bat'")
+
+        music_stopper_path = os.path.join(base_dir, "stop_music.bat")
+        stop_music_bat_content = (
+            "@echo off\n"
+            "if exist \"%~dp0music.running\" del /f /q \"%~dp0music.running\" >nul 2>&1\n"
+            "if not exist \"%~dp0plex.running\" if not exist \"%~dp0downloads.running\" (\n"
+            "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
+            ")\n"
+            f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/music >nul 2>&1\n"
+            "if not errorlevel 1 (\n"
+            "    exit /b 0\n"
+            ")\n"
+            "schtasks /End /TN \"PodMedia_StopMusic\" >nul 2>&1\n"
+            "schtasks /Run /TN \"PodMedia_StopMusic\" >nul 2>&1\n"
+            "if errorlevel 1 (\n"
+            f"    \"{pythonw_exe}\" \"%~dp0app\\app.py\" --stop-music\n"
+            ")\n"
+            "exit /b 0\n"
+        )
+        with open(music_stopper_path, "w", encoding="utf-8") as f:
+            f.write(stop_music_bat_content)
+        print(" [✓] Created Windows Music stopper: 'stop_music.bat'")
+
         status_path = os.path.join(base_dir, "status.bat")
         status_content = (
             "@echo off\n"
@@ -316,6 +359,7 @@ def run_setup():
             "    if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
             "    if exist \"%~dp0plex.running\" del /f /q \"%~dp0plex.running\" >nul 2>&1\n"
             "    if exist \"%~dp0downloads.running\" del /f /q \"%~dp0downloads.running\" >nul 2>&1\n"
+            "    if exist \"%~dp0music.running\" del /f /q \"%~dp0music.running\" >nul 2>&1\n"
             "    echo 1\n"
             "    exit /b 1\n"
             ")\n"
@@ -335,6 +379,7 @@ def run_setup():
             "if exist \"%~dp0podmedia.running\" del /f /q \"%~dp0podmedia.running\" >nul 2>&1\n"
             "if exist \"%~dp0plex.running\" del /f /q \"%~dp0plex.running\" >nul 2>&1\n"
             "if exist \"%~dp0downloads.running\" del /f /q \"%~dp0downloads.running\" >nul 2>&1\n"
+            "if exist \"%~dp0music.running\" del /f /q \"%~dp0music.running\" >nul 2>&1\n"
             f"curl.exe -s -o nul -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/system/quit >nul 2>&1\n"
             "if not errorlevel 1 (\n"
             "    echo [OK] PodMedia kapatma ve disk ayirma islemi baslatildi.\n"
@@ -375,6 +420,7 @@ def run_setup():
             "Run '.\\start.bat' or double-click 'start.bat' to launch PodMedia.\n"
             " Run '.\\start_plex.bat' / '.\\stop_plex.bat' to control Plex mode.\n"
             " Run '.\\start_downloads.bat' / '.\\stop_downloads.bat' to control Downloads mode.\n"
+            " Run '.\\start_music.bat' / '.\\stop_music.bat' to control Music mode.\n"
             " Run '.\\stop.bat' or double-click 'stop.bat' to stop PodMedia & release external drives."
         )
     else:
@@ -403,8 +449,10 @@ def run_setup():
         write_sh("start.sh", start_sh_content)
         print(" [✓] Created Unix launcher: 'start.sh' (chmod +x)")
 
-        for mode in ("plex", "downloads"):
-            other_mode = "downloads" if mode == "plex" else "plex"
+        all_modes = ("plex", "downloads", "music")
+        for mode in all_modes:
+            other_modes = [m for m in all_modes if m != mode]
+            other_cond = " && ".join([f"[ ! -f \"$SCRIPT_DIR/{m}.running\" ]" for m in other_modes])
             start_mode_sh = (
                 "#!/usr/bin/env bash\n"
                 "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
@@ -423,7 +471,7 @@ def run_setup():
                 "#!/usr/bin/env bash\n"
                 "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
                 f"rm -f \"$SCRIPT_DIR/{mode}.running\"\n"
-                f"if [ ! -f \"$SCRIPT_DIR/{other_mode}.running\" ]; then\n"
+                f"if {other_cond}; then\n"
                 "    rm -f \"$SCRIPT_DIR/podmedia.running\"\n"
                 "fi\n"
                 f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/autostop/{mode} >/dev/null 2>&1; then\n"
@@ -442,7 +490,7 @@ def run_setup():
             "    echo 0\n"
             "    exit 0\n"
             "else\n"
-            "    rm -f \"$SCRIPT_DIR/podmedia.running\" \"$SCRIPT_DIR/plex.running\" \"$SCRIPT_DIR/downloads.running\"\n"
+            "    rm -f \"$SCRIPT_DIR/podmedia.running\" \"$SCRIPT_DIR/plex.running\" \"$SCRIPT_DIR/downloads.running\" \"$SCRIPT_DIR/music.running\"\n"
             "    echo 1\n"
             "    exit 1\n"
             "fi\n"
@@ -454,7 +502,7 @@ def run_setup():
             "#!/usr/bin/env bash\n"
             "# PodMedia Stop Script\n"
             "SCRIPT_DIR=\"$(cd \"$(dirname \"${BASH_SOURCE[0]}\")\" && pwd)\"\n"
-            "rm -f \"$SCRIPT_DIR/podmedia.running\" \"$SCRIPT_DIR/plex.running\" \"$SCRIPT_DIR/downloads.running\"\n\n"
+            "rm -f \"$SCRIPT_DIR/podmedia.running\" \"$SCRIPT_DIR/plex.running\" \"$SCRIPT_DIR/downloads.running\" \"$SCRIPT_DIR/music.running\"\n\n"
             f"if curl -s -o /dev/null -f --connect-timeout 1 http://127.0.0.1:{server_port}/api/system/quit >/dev/null 2>&1; then\n"
             "    echo \"[OK] PodMedia shutdown initiated.\"\n"
             "    exit 0\n"
@@ -476,6 +524,7 @@ def run_setup():
             "Run './start.sh' to launch PodMedia.\n"
             " Run './start_plex.sh' / './stop_plex.sh' to control Plex mode.\n"
             " Run './start_downloads.sh' / './stop_downloads.sh' to control Downloads mode.\n"
+            " Run './start_music.sh' / './stop_music.sh' to control Music mode.\n"
             " Run './stop.sh' to stop PodMedia & release external drives."
         )
 

@@ -104,6 +104,9 @@ class PodMediaTrayApp:
     def open_plex(self, icon=None, item=None):
         webbrowser.open("http://localhost:32400/web")
 
+    def open_aurral(self, icon=None, item=None):
+        webbrowser.open("http://localhost:3001")
+
     def toggle_mode(self, mode):
         def _handler(icon=None, item=None):
             self._run_api_action("toggle-group", mode)
@@ -157,6 +160,11 @@ class PodMediaTrayApp:
                 "Open Plex Player",
                 self.open_plex,
                 enabled=lambda item: bool(self._state["containers"].get("media_center_plex", False)),
+            ),
+            pystray.MenuItem(
+                "Open Music Discovery (Aurral)",
+                self.open_aurral,
+                enabled=lambda item: bool(self._state["containers"].get("media_center_aurral", False)),
             ),
             pystray.Menu.SEPARATOR,
             pystray.MenuItem(

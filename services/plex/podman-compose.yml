@@ -14,7 +14,7 @@ services:
       - PUID=${PUID:-1000}
       - PGID=${PGID:-1000}
       - TZ=${TZ:-UTC}
-      - VERSION=latest
+      - VERSION=docker
       - ADVERTISE_IP=${PLEX_ADVERTISE_IP:-http://localhost:32400}
     volumes:
       - ./config:/config:Z

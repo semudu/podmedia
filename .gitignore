@@ -38,6 +38,10 @@ start_downloads.bat
 start_downloads.sh
 stop_downloads.bat
 stop_downloads.sh
+start_music.bat
+start_music.sh
+stop_music.bat
+stop_music.sh
 stop.bat
 stop.sh
 status.bat

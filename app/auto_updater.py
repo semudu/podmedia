@@ -155,13 +155,29 @@ class ContainerAutoUpdater(threading.Thread):
         except Exception as e:
             print(f"Error recreating {container_name}:", e)
 
+    def _is_auto_update_enabled(self):
+        try:
+            import configparser
+            cfg = configparser.ConfigParser()
+            cfg_path = os.path.join(PROJECT_ROOT, "config.properties")
+            if os.path.exists(cfg_path):
+                cfg.read(cfg_path, encoding="utf-8")
+                return cfg.getboolean("automation", "auto_update_enabled", fallback=True)
+        except Exception:
+            pass
+        return True
+
     def run(self):
         # Initial sleep after startup so user doesn't experience delay when starting app
         time.sleep(self.initial_delay)
 
         while self.running:
             try:
-                self.check_and_update_running()
+                if self._is_auto_update_enabled():
+                    self.check_and_update_running()
+                else:
+                    with self.lock:
+                        self.last_result = "Otomatik güncelleme ayarlardan kapalı"
             except Exception as e:
                 print("AutoUpdater background loop error:", e)
 

@@ -14,6 +14,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 CONFIG_PROPERTIES_PATH = os.path.join(PROJECT_ROOT, "config.properties")
 PLEX_ENV_PATH = os.path.join(PROJECT_ROOT, "services", "plex", ".env")
 TRAKT_YML_PATH = os.path.join(PROJECT_ROOT, "services", "tools", "plextraktsync", "config", "config.yml")
+SLSKD_YML_PATH = os.path.join(PROJECT_ROOT, "services", "tools", "slskd", "config", "slskd.yml")
 ARR_CONFIGS = [
     ("radarr", os.path.join(PROJECT_ROOT, "services", "tools", "radarr", "config", "config.xml")),
     ("sonarr", os.path.join(PROJECT_ROOT, "services", "tools", "sonarr", "config", "config.xml")),
@@ -108,6 +109,67 @@ def _write_trakt_yml(sync_ratings, sync_watched, scrobble_threshold):
         new_text = re.sub(r"(^\s*scrobble_threshold:\s*)\d+", rf"\g<1>{thr}", new_text, flags=re.MULTILINE)
         if new_text != text:
             with open(TRAKT_YML_PATH, "w", encoding="utf-8") as f:
+                f.write(new_text)
+            return True
+    except Exception:
+        pass
+    return False
+
+
+def _read_slskd_yml():
+    res = {"available": os.path.exists(SLSKD_YML_PATH), "username": "", "listen_port": 50300, "share_music": True}
+    if not res["available"]:
+        return res
+    try:
+        with open(SLSKD_YML_PATH, "r", encoding="utf-8") as f:
+            text = f.read()
+        m_user = re.search(r'^\s*username:\s*["\']?([^"\'\r\n#]+)["\']?', text, re.MULTILINE)
+        if m_user:
+            res["username"] = m_user.group(1).strip()
+        m_port = re.search(r"^\s*listen_port:\s*(\d+)", text, re.MULTILINE)
+        if m_port:
+            res["listen_port"] = int(m_port.group(1))
+        res["share_music"] = bool(re.search(r"^\s*-\s*/music\b", text, re.MULTILINE))
+    except Exception:
+        pass
+    return res
+
+
+def _write_slskd_yml(username, listen_port, share_music):
+    if not os.path.exists(SLSKD_YML_PATH):
+        return False
+    try:
+        with open(SLSKD_YML_PATH, "r", encoding="utf-8") as f:
+            text = f.read()
+        new_text = text
+        clean_user = str(username or "").strip().replace('"', "")
+        if clean_user:
+            new_text = re.sub(
+                r'(^\s*username:\s*)[^\r\n]+',
+                rf'\g<1>"{clean_user}"',
+                new_text,
+                count=1,
+                flags=re.MULTILINE,
+            )
+        port_val = max(1024, min(65535, int(listen_port or 50300)))
+        new_text = re.sub(
+            r"(^\s*listen_port:\s*)\d+",
+            rf"\g<1>{port_val}",
+            new_text,
+            count=1,
+            flags=re.MULTILINE,
+        )
+        has_music = bool(re.search(r"^\s*-\s*/music\b", new_text, re.MULTILINE))
+        if share_music and not has_music:
+            if re.search(r"^\s*directories:\s*\[\s*\]", new_text, re.MULTILINE):
+                new_text = re.sub(r"(^\s*directories:)\s*\[\s*\]", r"\g<1>\n    - /music", new_text, count=1, flags=re.MULTILINE)
+            elif re.search(r"^shares:\s*\n\s*directories:", new_text, re.MULTILINE):
+                new_text = re.sub(r"(^shares:\s*\n\s*directories:)", r"\g<1>\n    - /music", new_text, count=1, flags=re.MULTILINE)
+        elif not share_music and has_music:
+            new_text = re.sub(r"^\s*-\s*/music\s*\r?\n?", "", new_text, flags=re.MULTILINE)
+            new_text = re.sub(r"(^shares:\s*\n\s*directories:)(\s*\n\s*\n|\s*$)", r"\g<1> []\n\n", new_text, count=1, flags=re.MULTILINE)
+        if new_text != text:
+            with open(SLSKD_YML_PATH, "w", encoding="utf-8") as f:
                 f.write(new_text)
             return True
     except Exception:
@@ -238,6 +300,7 @@ def get_settings():
 
     plex_env = _read_env_file(PLEX_ENV_PATH)
     trakt_cfg = _read_trakt_yml()
+    slskd_cfg = _read_slskd_yml()
     qbit = _read_qbit_limits()
     arr_ren = _read_arr_rename()
 
@@ -246,6 +309,12 @@ def get_settings():
         "watchlist_sync_minutes": cfg.getint("automation", "watchlist_sync_minutes", fallback=5),
         "auto_update_enabled": cfg.getboolean("automation", "auto_update_enabled", fallback=True),
         "watched_media_action": cfg.get("automation", "watched_media_action", fallback="keep"),
+        "disk_wake_policy": cfg.get("automation", "disk_wake_policy", fallback="media_only"),
+        "music_start_plex": cfg.getboolean("automation", "music_start_plex", fallback=False),
+        "slskd_available": slskd_cfg["available"],
+        "slskd_username": slskd_cfg["username"],
+        "slskd_listen_port": slskd_cfg["listen_port"],
+        "slskd_share_music": slskd_cfg["share_music"],
         "qbit_online": qbit["online"],
         "dl_limit_mbps": qbit["dl_limit_mbps"],
         "up_limit_kbps": qbit["up_limit_kbps"],
@@ -281,6 +350,10 @@ def save_settings(payload):
     watched_action = str(payload.get("watched_media_action", "keep")).strip()
     if watched_action not in ("keep", "delete_after_rating", "delete_after_24h", "delete_immediate"):
         watched_action = "keep"
+    disk_wake = str(payload.get("disk_wake_policy", "media_only")).strip().lower()
+    if disk_wake not in ("media_only", "manual", "always"):
+        disk_wake = "media_only"
+    music_start_plex = bool(payload.get("music_start_plex", False))
 
     cfg.set("server", "port", str(port))
     if not cfg.has_option("paths", "media_dir"):
@@ -292,6 +365,8 @@ def save_settings(payload):
     cfg.set("automation", "watchlist_sync_minutes", str(sync_min))
     cfg.set("automation", "auto_update_enabled", "true" if auto_update else "false")
     cfg.set("automation", "watched_media_action", watched_action)
+    cfg.set("automation", "disk_wake_policy", disk_wake)
+    cfg.set("automation", "music_start_plex", "true" if music_start_plex else "false")
 
     with open(CONFIG_PROPERTIES_PATH, "w", encoding="utf-8") as f:
         cfg.write(f)
@@ -347,6 +422,19 @@ def save_settings(payload):
         if trakt_changed:
             restart_targets.append("plextraktsync")
 
+    # Update Slskd config/slskd.yml
+    if os.path.exists(SLSKD_YML_PATH) and (
+        "slskd_username" in payload or "slskd_listen_port" in payload or "slskd_share_music" in payload
+    ):
+        slskd_cur = _read_slskd_yml()
+        slskd_changed = _write_slskd_yml(
+            payload.get("slskd_username", slskd_cur["username"]),
+            payload.get("slskd_listen_port", slskd_cur["listen_port"]),
+            bool(payload.get("slskd_share_music", slskd_cur["share_music"])),
+        )
+        if slskd_changed:
+            restart_targets.append("slskd")
+
     # Deduplicate while preserving order
     seen = set()
     restart_targets = [x for x in restart_targets if not (x in seen or seen.add(x))]
@@ -366,6 +454,10 @@ def reset_to_defaults():
         "watchlist_sync_minutes": 5,
         "auto_update_enabled": True,
         "watched_media_action": "keep",
+        "disk_wake_policy": "media_only",
+        "music_start_plex": False,
+        "slskd_listen_port": 50300,
+        "slskd_share_music": True,
         "dl_limit_mbps": 0,
         "up_limit_kbps": 0,
         "auto_rename_media": True,

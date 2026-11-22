@@ -564,6 +564,40 @@
             flex-wrap: wrap;
         }
 
+        .music-stats-grid {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            padding: 14px 16px;
+        }
+
+        .music-stat-tile {
+            background: var(--bg-subtle);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .music-stat-val {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.01em;
+        }
+
+        .music-stat-lbl {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        @media (max-width: 720px) {
+            .music-stats-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+
         /* Admin Settings Form (Collapsible Expert Section) */
         .settings-accordion {
             overflow: hidden;
@@ -1188,7 +1222,7 @@
                 </button>
                 <button class="nav-tab" id="tab-admin" onclick="switchView('admin')">
                     <span data-i18n="tabAdmin">Yönetim</span>
-                    <span class="tab-badge" id="tab-services-count">0/10</span>
+                    <span class="tab-badge" id="tab-services-count">0/9</span>
                 </button>
             </nav>
         </div>
@@ -1275,7 +1309,7 @@
                     </div>
                     <div>
                         <div class="hub-title" data-i18n="modeMusic">Müzik Arşivi</div>
-                        <div class="hub-desc" data-i18n="modeMusicDesc">Yüksek kaliteli müzik indir ve kütüphaneni otomatik etiketle.</div>
+                        <div class="hub-desc" data-i18n="modeMusicDesc">Plexamp dinlemelerine göre müzik keşfet, parça veya albüm indir ve arşivle.</div>
                     </div>
                     <div class="hub-meta-line">
                         <span class="badge off" id="group-music-badge"><span class="status-dot"></span><span id="group-music-text">...</span></span>
@@ -1283,8 +1317,7 @@
                     </div>
                 </div>
                 <div class="hub-card-footer">
-                    <button class="card-action-btn" id="quick-music-tag-btn" onclick="triggerAction('music-sync', '')" disabled data-i18n="organizeMusic">Arşivi Düzenle ⚡</button>
-                    <a href="#" data-port="8081" target="_blank" class="btn btn-sm disabled-link" id="quick-metube-link">YouTube ↗</a>
+                    <a href="#" data-port="3001" target="_blank" class="card-action-btn disabled-link" id="quick-aurral-link" data-i18n="openMusicHub">Müzik Keşfet ↗</a>
                 </div>
             </div>
         </div>
@@ -1308,7 +1341,7 @@
             </div>
         </div>
 
-        <!-- 3. CONNECTED ECOSYSTEM STRIP (Trakt.tv) -->
+        <!-- 3. CONNECTED ECOSYSTEM STRIP (Trakt.tv & Music Ecosystem) -->
         <div class="panel-box">
             <div class="eco-row">
                 <div class="eco-left">
@@ -1324,6 +1357,22 @@
                 <div class="eco-actions">
                     <button class="btn btn-sm" id="int-trakt-sync-btn" onclick="syncTraktWatchlistNow()" data-i18n="syncWatchlist">🔄 Watchlist Eşitle</button>
                     <a href="https://trakt.tv/users/me/watchlist" target="_blank" class="btn btn-sm">Trakt ↗</a>
+                </div>
+            </div>
+            <div class="eco-row">
+                <div class="eco-left">
+                    <div class="icon-box" style="width: 34px; height: 34px; font-size: 1rem;">🎧</div>
+                    <div style="min-width: 0;">
+                        <div class="eco-title">
+                            <span data-i18n="musicEcoTitle">Müzik Ekosistemi</span>
+                            <span class="badge off" id="int-music-badge">...</span>
+                        </div>
+                        <div class="eco-sub" id="int-music-meta">...</div>
+                    </div>
+                </div>
+                <div class="eco-actions">
+                    <a href="https://listenbrainz.org" target="_blank" class="btn btn-sm" id="int-lb-link" style="display: none;">ListenBrainz ↗</a>
+                    <a href="#" data-port="3001" target="_blank" class="btn btn-sm disabled-link" id="int-aurral-link">Aurral ↗</a>
                 </div>
             </div>
         </div>
@@ -1356,8 +1405,8 @@
                     <a href="#" data-port="8080" target="_blank" class="btn btn-sm disabled-link" id="lib-link-qbit">qBittorrent ↗</a>
                     <a href="#" data-port="7878" target="_blank" class="btn btn-sm disabled-link" id="lib-link-radarr">Radarr ↗</a>
                     <a href="#" data-port="8989" target="_blank" class="btn btn-sm disabled-link" id="lib-link-sonarr">Sonarr ↗</a>
+                    <a href="#" data-port="3001" target="_blank" class="btn btn-sm disabled-link" id="lib-link-aurral">Aurral ↗</a>
                     <a href="#" data-port="5030" target="_blank" class="btn btn-sm disabled-link" id="lib-link-slskd">Slskd ↗</a>
-                    <a href="#" data-port="8081" target="_blank" class="btn btn-sm disabled-link" id="lib-link-metube">MeTube ↗</a>
                 </div>
             </div>
             <div id="lib-dl-list">
@@ -1380,6 +1429,38 @@
             </div>
             <div class="lib-list" id="lib-items-list">
                 <div class="empty-state" data-i18n="loadingText">Yükleniyor...</div>
+            </div>
+        </div>
+
+        <!-- Compact Music Library Summary -->
+        <div class="panel-box">
+            <div class="panel-header">
+                <div class="panel-title">🎵 <span data-i18n="modeMusic">Müzik Arşivi</span> <span class="badge off" id="lib-music-jobs-badge" style="display: none;"></span></div>
+                <div class="tools-strip">
+                    <a href="#" data-port="3001" target="_blank" class="btn btn-sm disabled-link" id="lib-music-aurral-btn" data-i18n="openMusicHub">Müzik Keşfet ↗</a>
+                </div>
+            </div>
+            <div class="music-stats-grid">
+                <div class="music-stat-tile">
+                    <div class="music-stat-val" id="lib-music-artists">—</div>
+                    <div class="music-stat-lbl" data-i18n="statArtists">Sanatçı</div>
+                </div>
+                <div class="music-stat-tile">
+                    <div class="music-stat-val" id="lib-music-albums">—</div>
+                    <div class="music-stat-lbl" data-i18n="statAlbums">Albüm</div>
+                </div>
+                <div class="music-stat-tile">
+                    <div class="music-stat-val" id="lib-music-tracks">—</div>
+                    <div class="music-stat-lbl" data-i18n="statTracks">Parça</div>
+                </div>
+                <div class="music-stat-tile">
+                    <div class="music-stat-val" id="lib-music-flac">—</div>
+                    <div class="music-stat-lbl" data-i18n="statFlac">FLAC / Kayıpsız</div>
+                </div>
+                <div class="music-stat-tile">
+                    <div class="music-stat-val" id="lib-music-size">—</div>
+                    <div class="music-stat-lbl" data-i18n="statDiskSize">Disk Alanı</div>
+                </div>
             </div>
         </div>
     </section>
@@ -1540,7 +1621,24 @@
         <div class="panel-box" id="svc-group-music">
             <div class="panel-header">
                 <div class="panel-title">🎵 <span data-i18n="modeMusic">Müzik Arşivi</span></div>
-                <span class="badge off" id="svc-group-music-count">0 / 3</span>
+                <span class="badge off" id="svc-group-music-count">0 / 2</span>
+            </div>
+            <div class="service-row">
+                <div class="svc-left">
+                    <span class="svc-dot" id="dot-app-aurral"></span>
+                    <div>
+                        <div class="svc-name" data-i18n="appAurral">Aurral (Keşif & İndirme)</div>
+                        <div class="svc-role" id="sub-app-aurral">...</div>
+                    </div>
+                </div>
+                <div class="svc-right">
+                    <span class="svc-port">:3001</span>
+                    <a href="#" data-port="3001" target="_blank" class="btn btn-sm disabled-link" id="link-app-aurral" data-i18n="openUi">Aç ↗</a>
+                    <label class="switch sm">
+                        <input type="checkbox" id="app-aurral-toggle" onchange="triggerAction('toggle-app', 'aurral')">
+                        <span class="slider"></span>
+                    </label>
+                </div>
             </div>
             <div class="service-row">
                 <div class="svc-left">
@@ -1555,39 +1653,6 @@
                     <a href="#" data-port="5030" target="_blank" class="btn btn-sm disabled-link" id="link-app-slskd" data-i18n="openUi">Aç ↗</a>
                     <label class="switch sm">
                         <input type="checkbox" id="app-slskd-toggle" onchange="triggerAction('toggle-app', 'slskd')">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-            <div class="service-row">
-                <div class="svc-left">
-                    <span class="svc-dot" id="dot-app-metube"></span>
-                    <div>
-                        <div class="svc-name">MeTube (YouTube)</div>
-                        <div class="svc-role" id="sub-app-metube">...</div>
-                    </div>
-                </div>
-                <div class="svc-right">
-                    <span class="svc-port">:8081</span>
-                    <a href="#" data-port="8081" target="_blank" class="btn btn-sm disabled-link" id="link-app-metube" data-i18n="openUi">Aç ↗</a>
-                    <label class="switch sm">
-                        <input type="checkbox" id="app-metube-toggle" onchange="triggerAction('toggle-app', 'metube')">
-                        <span class="slider"></span>
-                    </label>
-                </div>
-            </div>
-            <div class="service-row">
-                <div class="svc-left">
-                    <span class="svc-dot" id="dot-app-beets"></span>
-                    <div>
-                        <div class="svc-name" data-i18n="appBeets">Beets (Etiketleme)</div>
-                        <div class="svc-role" id="sub-app-beets">...</div>
-                    </div>
-                </div>
-                <div class="svc-right">
-                    <button class="btn btn-sm" id="beets-tag-btn" onclick="triggerAction('music-sync', '')" data-i18n="tagBtn" disabled>Etiketle ⚡</button>
-                    <label class="switch sm">
-                        <input type="checkbox" id="app-beets-toggle" onchange="triggerAction('toggle-app', 'beets')">
                         <span class="slider"></span>
                     </label>
                 </div>
@@ -1674,13 +1739,47 @@
                     </div>
                 </div>
 
+                <div class="settings-group-title" data-i18n="setGroupMusic">🎵 Müzik & Slskd</div>
+                <div class="settings-grid">
+                    <div class="field" id="slskd-user-field">
+                        <label for="set-slskd-user" data-i18n="lblSlskdUser">Soulseek (Slskd) Kullanıcı Adı</label>
+                        <input type="text" id="set-slskd-user" placeholder="slsk_user">
+                    </div>
+                    <div class="field" id="slskd-port-field">
+                        <label for="set-slskd-port" data-i18n="lblSlskdPort">Slskd Dinleme Portu</label>
+                        <input type="number" id="set-slskd-port" min="1024" max="65535" value="50300">
+                    </div>
+                    <div class="field-toggle" id="slskd-share-field">
+                        <span data-i18n="lblSlskdShare">Slskd Müzik Paylaşımı (/music)</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-slskd-share" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="field-toggle">
+                        <span data-i18n="lblMusicStartPlex">Müzik Modunda Plex'i de Başlat</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-music-start-plex">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="settings-group-title" data-i18n="setGroupSystem">🛠️ Sistem</div>
                 <div class="settings-grid">
                     <div class="field">
                         <label for="set-server-port" data-i18n="lblPort">PodMedia Panel Portu</label>
                         <input type="number" id="set-server-port" min="1024" max="65535" value="3000">
                     </div>
-                    <div class="field-toggle" style="align-self: end;">
+                    <div class="field">
+                        <label for="set-disk-wake-policy" data-i18n="lblDiskWakePolicy">Harici Disk Uyandırma Politikası</label>
+                        <select id="set-disk-wake-policy">
+                            <option value="media_only" data-i18n="optWakeMediaOnly">Yalnızca Film/Dizi servisleri başlarken (Önerilen)</option>
+                            <option value="manual" data-i18n="optWakeManual">Yalnızca manuel uyandır (Müzik/Plexamp 0 RPM)</option>
+                            <option value="always" data-i18n="optWakeAlways">PodMedia açılır açılmaz uyandır</option>
+                        </select>
+                    </div>
+                    <div class="field-toggle" style="grid-column: 1 / -1;">
                         <span data-i18n="lblAutoUpdate">Otomatik Konteyner Güncelleme</span>
                         <label class="switch sm">
                             <input type="checkbox" id="set-auto-update" checked>
@@ -1824,13 +1923,11 @@
                 modeDownload: 'Kütüphane & İndirme',
                 modeDownloadDesc: 'İzleme listendeki film ve dizileri otomatik bulup indirir.',
                 modeMusic: 'Müzik Arşivi',
-                modeMusicDesc: 'Yüksek kaliteli müzik indir ve kütüphaneni otomatik etiketle.',
+                modeMusicDesc: 'Plexamp dinlemelerine göre müzik keşfet, parça veya albüm indir ve arşivle.',
                 openPlayer: 'Oynatıcıyı Aç ↗',
                 openLibrary: 'Kütüphaneyi Aç →',
-                organizeMusic: 'Arşivi Düzenle ⚡',
+                openMusicHub: 'Müzik Keşfet ↗',
                 manageBtn: 'Yönet',
-                liveDownloadsTitle: 'Aktif İndirmeler',
-                viewAllLibrary: 'Kütüphanede Gör →',
                 syncWatchlist: '🔄 Watchlist Eşitle',
                 syncingLong: '⏳ Eşitleniyor...',
                 syncedLong: '✓ Eşitlendi',
@@ -1861,7 +1958,25 @@
                 settingsSummarySub: 'Otomasyon, hız limitleri, ağ, port ve servis ince ayarları',
                 setGroupDownloads: '📥 İndirme, Hız & Kütüphane',
                 setGroupNetwork: '🎬 Plex, Trakt & Ağ',
+                setGroupMusic: '🎵 Müzik & Slskd',
                 setGroupSystem: '🛠️ Sistem',
+                lblSlskdUser: 'Soulseek (Slskd) Kullanıcı Adı',
+                lblSlskdPort: 'Slskd Dinleme Portu',
+                lblSlskdShare: 'Slskd Müzik Paylaşımı (/music)',
+                lblMusicStartPlex: "Müzik Modunda Plex'i de Başlat",
+                lblDiskWakePolicy: 'Harici Disk Uyandırma Politikası',
+                optWakeMediaOnly: 'Yalnızca Film/Dizi servisleri başlarken (Önerilen)',
+                optWakeManual: 'Yalnızca manuel uyandır (Müzik/Plexamp 0 RPM)',
+                optWakeAlways: 'PodMedia açılır açılmaz uyandır',
+                musicEcoTitle: 'Müzik Ekosistemi',
+                musicEcoOff: 'Aurral bağlantısı (Plex / ListenBrainz) henüz kurulmamış.',
+                statArtists: 'Sanatçı',
+                statAlbums: 'Albüm',
+                statTracks: 'Parça',
+                statFlac: 'FLAC / Kayıpsız',
+                statDiskSize: 'Disk Alanı',
+                musicJobsActive: (n) => `${n} işleniyor`,
+                musicJobsFailed: (n) => `${n} başarısız`,
                 restartHint: 'Değişikliklerin aktif olması için yeniden başlatın',
                 lblPort: 'PodMedia Panel Portu',
                 lblWatchedAction: 'İzlenen İçerik Politikası',
@@ -1895,8 +2010,7 @@
                 openUi: 'Aç ↗',
                 appRadarr: 'Radarr (Filmler)',
                 appSonarr: 'Sonarr (Diziler)',
-                appBeets: 'Beets (Etiketleme)',
-                tagBtn: 'Etiketle ⚡',
+                appAurral: 'Aurral (Keşif & İndirme)',
                 syncBtn: 'Eşitle',
                 connected: 'Bağlı',
                 notConnected: 'Kurulu Değil',
@@ -1908,16 +2022,13 @@
                 traktMetaConnected: (u, cnt) => `Hesap: <b>${u || '-'}</b>${cnt !== null ? ` • <b>${cnt}</b> Watchlist öğesi` : ''}`,
                 traktMetaOff: 'Trakt.tv entegrasyonu henüz kurulmamış.',
                 libStatSummary: (m, s) => `${m} film • ${s} dizi`,
+                musicStatSummary: (alb, tr, gb) => alb > 0 ? `${alb} albüm • ${tr} parça • ${gb} GB` : `${tr} parça • ${gb} GB`,
                 diskFallback: 'Harici Arşiv Diski',
                 diskNotAttached: 'Takılı Değil',
                 diskConnectedFree: (gb) => `Bağlı • ${gb} GB Boş`,
                 storageHeroSub: 'Hibrit yerel + harici medya depolama',
                 usedCapacity: (u, tot, pct) => `Kullanılan: <b>${u} GB</b> / ${tot} GB (%${pct})`,
                 freeCapacity: (f) => `Boş Alan: <b>${f} GB</b>`,
-                ecoSystemTitle: 'Sistem & Servisler',
-                ecoSystemSub: 'Otomatik konteyner güncelleme aktif',
-                checkUpdatesShort: '🔄 Güncelle',
-                openAdminBtn: 'Yönetim Paneli →',
                 activeDlPill: (n, spd) => spd > 0 ? `⬇ ${n} iniyor • ${spd} MB/s` : `⬇ ${n} aktif`,
                 transferringMeta: (pct, spd) => `Aktarım sürüyor: <b>%${pct}</b> (${spd} MB/s)`,
                 pendingMeta: (tot, mov, ser) => `Yerelde aktarılmayı bekleyen <b>${tot} GB</b> var (Film: ${mov} GB, Dizi: ${ser} GB).`,
@@ -1963,13 +2074,11 @@
                 modeDownload: 'Library & Downloads',
                 modeDownloadDesc: 'Automatically finds and downloads titles from your watchlist.',
                 modeMusic: 'Music Library',
-                modeMusicDesc: 'Download lossless audio and automatically organize your music.',
+                modeMusicDesc: 'Discover music from Plexamp listens, download tracks or full albums, and organize.',
                 openPlayer: 'Open Player ↗',
                 openLibrary: 'Open Library →',
-                organizeMusic: 'Organize Music ⚡',
+                openMusicHub: 'Discover Music ↗',
                 manageBtn: 'Manage',
-                liveDownloadsTitle: 'Active Downloads',
-                viewAllLibrary: 'View in Library →',
                 syncWatchlist: '🔄 Sync Watchlist',
                 syncingLong: '⏳ Syncing...',
                 syncedLong: '✓ Synced',
@@ -2000,7 +2109,25 @@
                 settingsSummarySub: 'Automation, speed limits, network, port & service fine-tuning',
                 setGroupDownloads: '📥 Downloads, Speed & Library',
                 setGroupNetwork: '🎬 Plex, Trakt & Network',
+                setGroupMusic: '🎵 Music & Slskd',
                 setGroupSystem: '🛠️ System',
+                lblSlskdUser: 'Soulseek (Slskd) Username',
+                lblSlskdPort: 'Slskd Listen Port',
+                lblSlskdShare: 'Share Music Folder (/music) on Slskd',
+                lblMusicStartPlex: 'Also Start Plex with Music Mode',
+                lblDiskWakePolicy: 'External Disk Wake Policy',
+                optWakeMediaOnly: 'Only when Movie/TV services start (Recommended)',
+                optWakeManual: 'Manual wake only (0 RPM during Music/Plexamp)',
+                optWakeAlways: 'Always wake when PodMedia starts',
+                musicEcoTitle: 'Music Ecosystem',
+                musicEcoOff: 'Aurral integrations (Plex / ListenBrainz) not connected yet.',
+                statArtists: 'Artists',
+                statAlbums: 'Albums',
+                statTracks: 'Tracks',
+                statFlac: 'FLAC / Lossless',
+                statDiskSize: 'Disk Usage',
+                musicJobsActive: (n) => `${n} active`,
+                musicJobsFailed: (n) => `${n} failed`,
                 restartHint: 'Restart required to apply changes',
                 lblPort: 'PodMedia Panel Port',
                 lblWatchedAction: 'Watched Media Policy',
@@ -2034,8 +2161,7 @@
                 openUi: 'Open ↗',
                 appRadarr: 'Radarr (Movies)',
                 appSonarr: 'Sonarr (TV Shows)',
-                appBeets: 'Beets (Tagging)',
-                tagBtn: 'Tag ⚡',
+                appAurral: 'Aurral (Discovery & Downloads)',
                 syncBtn: 'Sync',
                 connected: 'Connected',
                 notConnected: 'Not Configured',
@@ -2047,16 +2173,13 @@
                 traktMetaConnected: (u, cnt) => `Account: <b>${u || '-'}</b>${cnt !== null ? ` • <b>${cnt}</b> Watchlist items` : ''}`,
                 traktMetaOff: 'Trakt.tv integration is not set up yet.',
                 libStatSummary: (m, s) => `${m} movies • ${s} shows`,
+                musicStatSummary: (alb, tr, gb) => alb > 0 ? `${alb} albums • ${tr} tracks • ${gb} GB` : `${tr} tracks • ${gb} GB`,
                 diskFallback: 'External Archive Disk',
                 diskNotAttached: 'Offline',
                 diskConnectedFree: (gb) => `Connected • ${gb} GB Free`,
                 storageHeroSub: 'Hybrid local + external media storage',
                 usedCapacity: (u, tot, pct) => `Used: <b>${u} GB</b> / ${tot} GB (${pct}%)`,
                 freeCapacity: (f) => `Free: <b>${f} GB</b>`,
-                ecoSystemTitle: 'System & Services',
-                ecoSystemSub: 'Automatic container updates active',
-                checkUpdatesShort: '🔄 Updates',
-                openAdminBtn: 'Admin Panel →',
                 activeDlPill: (n, spd) => spd > 0 ? `⬇ ${n} active • ${spd} MB/s` : `⬇ ${n} active`,
                 transferringMeta: (pct, spd) => `Transferring: <b>${pct}%</b> (${spd} MB/s)`,
                 pendingMeta: (tot, mov, ser) => `<b>${tot} GB</b> pending local transfer (Movies: ${mov} GB, Shows: ${ser} GB).`,
@@ -2168,7 +2291,7 @@
 
             const entries = Object.entries(containers);
             anyRunning = entries.some(([, v]) => v === true);
-            const totalServices = entries.length || 10;
+            const totalServices = entries.length || 9;
             const runningCount = entries.filter(([, v]) => v === true).length;
 
             const tabCount = document.getElementById('tab-services-count');
@@ -2212,21 +2335,14 @@
             updateModeCard('music', groups.music);
 
             setLinkEnabled('quick-plex-link', containers.media_center_plex);
-            setLinkEnabled('quick-metube-link', containers.media_center_metube);
+            setLinkEnabled('quick-aurral-link', containers.media_center_aurral);
+            setLinkEnabled('int-aurral-link', containers.media_center_aurral);
+            setLinkEnabled('lib-music-aurral-btn', containers.media_center_aurral);
             setLinkEnabled('lib-link-qbit', containers.media_center_qbittorrent);
             setLinkEnabled('lib-link-radarr', containers.media_center_radarr);
             setLinkEnabled('lib-link-sonarr', containers.media_center_sonarr);
+            setLinkEnabled('lib-link-aurral', containers.media_center_aurral);
             setLinkEnabled('lib-link-slskd', containers.media_center_slskd);
-            setLinkEnabled('lib-link-metube', containers.media_center_metube);
-
-            const musicTagBtn = document.getElementById('quick-music-tag-btn');
-            if (musicTagBtn) {
-                musicTagBtn.disabled = !containers.media_center_beets || isSystemBusy;
-            }
-            const beetsTagBtn = document.getElementById('beets-tag-btn');
-            if (beetsTagBtn) {
-                beetsTagBtn.disabled = !containers.media_center_beets || isSystemBusy;
-            }
 
             updateGroupBadge('svc-group-plex-count', [containers.media_center_plex, containers.media_center_plextraktsync]);
             updateGroupBadge('svc-group-downloads-count', [
@@ -2237,9 +2353,8 @@
                 containers.media_center_flaresolverr
             ]);
             updateGroupBadge('svc-group-music-count', [
-                containers.media_center_slskd,
-                containers.media_center_metube,
-                containers.media_center_beets
+                containers.media_center_aurral,
+                containers.media_center_slskd
             ]);
 
             updateServiceRow('plex', containers.media_center_plex);
@@ -2249,9 +2364,8 @@
             updateServiceRow('qbittorrent', containers.media_center_qbittorrent);
             updateServiceRow('prowlarr', containers.media_center_prowlarr);
             updateServiceRow('flaresolverr', containers.media_center_flaresolverr);
+            updateServiceRow('aurral', containers.media_center_aurral);
             updateServiceRow('slskd', containers.media_center_slskd);
-            updateServiceRow('metube', containers.media_center_metube);
-            updateServiceRow('beets', containers.media_center_beets);
 
             const traktBtn = document.getElementById('trakt-sync-btn');
             const intTraktBtn = document.getElementById('int-trakt-sync-btn');
@@ -2345,7 +2459,9 @@
         function renderHubSummary(hub) {
             const plex = (hub.integrations && hub.integrations.plex) || {};
             const trakt = (hub.integrations && hub.integrations.trakt) || {};
+            const musicEco = (hub.integrations && hub.integrations.music) || {};
             const lib = hub.library || {};
+            const mus = hub.music || {};
             const dl = hub.downloads || {};
 
             // 1. Plex account info directly inside Cinema card (zero duplication)
@@ -2373,12 +2489,75 @@
                 }
             }
 
-            // 3. Overview library & subtle live download summary (zero layout shift!)
+            // 2b. Music ecosystem row (ListenBrainz / Plexamp / Last.fm / Flows)
+            const intMusicBadge = document.getElementById('int-music-badge');
+            const intMusicMeta = document.getElementById('int-music-meta');
+            const intLbLink = document.getElementById('int-lb-link');
+            if (intMusicBadge && intMusicMeta) {
+                if (musicEco.connected) {
+                    intMusicBadge.className = 'badge ' + (musicEco.online ? 'on' : 'info');
+                    intMusicBadge.innerText = musicEco.online ? `${t('connected')} • ${t('running')}` : t('connected');
+                    const parts = [];
+                    if (musicEco.listenbrainz_user) parts.push(`ListenBrainz: <b>${escapeHtml(musicEco.listenbrainz_user)}</b>`);
+                    if (musicEco.plex_synced) parts.push(`Plexamp: <b>${escapeHtml(musicEco.plex_user || t('connected'))}</b>`);
+                    if (musicEco.lastfm_imported) parts.push(`Last.fm: <b>Mix</b>`);
+                    if (musicEco.flows_count > 0) parts.push(`<b>${musicEco.flows_count}</b> Flow`);
+                    if (musicEco.playlists_count > 0) parts.push(`<b>${musicEco.playlists_count}</b> Playlist`);
+                    intMusicMeta.innerHTML = parts.join(' • ') || 'Aurral';
+                    if (intLbLink) {
+                        if (musicEco.listenbrainz_user) {
+                            intLbLink.href = `https://listenbrainz.org/user/${encodeURIComponent(musicEco.listenbrainz_user)}/`;
+                            intLbLink.style.display = 'inline-flex';
+                        } else {
+                            intLbLink.style.display = 'none';
+                        }
+                    }
+                } else {
+                    intMusicBadge.className = 'badge off';
+                    intMusicBadge.innerText = t('notConnected');
+                    intMusicMeta.innerText = t('musicEcoOff');
+                    if (intLbLink) intLbLink.style.display = 'none';
+                }
+            }
+
+            // 3. Overview library, music & subtle live download summary (zero layout shift!)
             const libStat = document.getElementById('overview-lib-stat');
             if (libStat) {
                 libStat.innerText = (lib.radarr_online || lib.sonarr_online)
                     ? t('libStatSummary')(lib.movies_total || 0, lib.shows_total || 0)
                     : '';
+            }
+            const musicStat = document.getElementById('overview-music-stat');
+            if (musicStat) {
+                musicStat.innerText = (mus.tracks > 0)
+                    ? t('musicStatSummary')(mus.albums || 0, mus.tracks || 0, mus.size_gb || 0)
+                    : '';
+            }
+
+            // 3b. Library view Music summary tiles
+            const elArtists = document.getElementById('lib-music-artists');
+            const elAlbums = document.getElementById('lib-music-albums');
+            const elTracks = document.getElementById('lib-music-tracks');
+            const elFlac = document.getElementById('lib-music-flac');
+            const elSize = document.getElementById('lib-music-size');
+            const elJobs = document.getElementById('lib-music-jobs-badge');
+            if (elArtists) elArtists.innerText = mus.artists ?? 0;
+            if (elAlbums) elAlbums.innerText = mus.albums ?? 0;
+            if (elTracks) elTracks.innerText = mus.tracks ?? 0;
+            if (elFlac) elFlac.innerText = mus.tracks > 0 ? `%${mus.flac_pct || 0} (${mus.flac_tracks || 0})` : '—';
+            if (elSize) elSize.innerText = `${mus.size_gb || 0} GB`;
+            if (elJobs) {
+                if ((mus.jobs_active || 0) > 0) {
+                    elJobs.style.display = 'inline-flex';
+                    elJobs.className = 'badge info';
+                    elJobs.innerText = t('musicJobsActive')(mus.jobs_active);
+                } else if ((mus.jobs_failed || 0) > 0) {
+                    elJobs.style.display = 'inline-flex';
+                    elJobs.className = 'badge busy';
+                    elJobs.innerText = t('musicJobsFailed')(mus.jobs_failed);
+                } else {
+                    elJobs.style.display = 'none';
+                }
             }
 
             const tabDlBadge = document.getElementById('tab-dl-badge');
@@ -2952,6 +3131,18 @@
             document.getElementById('set-plex-host').value = s.plex_hostname ?? '';
             document.getElementById('set-tz').value = s.timezone ?? 'Europe/Istanbul';
             document.getElementById('set-auto-update').checked = !!s.auto_update_enabled;
+            document.getElementById('set-disk-wake-policy').value = s.disk_wake_policy ?? 'media_only';
+            document.getElementById('set-music-start-plex').checked = !!s.music_start_plex;
+
+            const showSlskd = s.slskd_available !== false;
+            document.getElementById('slskd-user-field').style.display = showSlskd ? 'flex' : 'none';
+            document.getElementById('slskd-port-field').style.display = showSlskd ? 'flex' : 'none';
+            document.getElementById('slskd-share-field').style.display = showSlskd ? 'flex' : 'none';
+            if (showSlskd) {
+                document.getElementById('set-slskd-user').value = s.slskd_username ?? '';
+                document.getElementById('set-slskd-port').value = s.slskd_listen_port ?? 50300;
+                document.getElementById('set-slskd-share').checked = s.slskd_share_music !== false;
+            }
 
             const showTrakt = !!s.trakt_available;
             document.getElementById('trakt-threshold-field').style.display = showTrakt ? 'flex' : 'none';
@@ -3017,6 +3208,11 @@
                     plex_hostname: document.getElementById('set-plex-host').value.trim(),
                     timezone: document.getElementById('set-tz').value.trim(),
                     auto_update_enabled: document.getElementById('set-auto-update').checked,
+                    disk_wake_policy: document.getElementById('set-disk-wake-policy').value,
+                    music_start_plex: document.getElementById('set-music-start-plex').checked,
+                    slskd_username: document.getElementById('set-slskd-user').value.trim(),
+                    slskd_listen_port: parseInt(document.getElementById('set-slskd-port').value, 10) || 50300,
+                    slskd_share_music: document.getElementById('set-slskd-share').checked,
                     trakt_scrobble_threshold: parseInt(document.getElementById('set-trakt-threshold').value, 10) || 80,
                     trakt_sync_ratings: document.getElementById('set-trakt-ratings').checked,
                     trakt_sync_watched: document.getElementById('set-trakt-watched').checked

@@ -8,7 +8,7 @@ Write-Host ""
 
 # 1. Add Windows Firewall Rule
 Write-Host "[1/2] Setting Windows Firewall Rules..." -ForegroundColor Yellow
-New-NetFirewallRule -DisplayName "PodMedia Services" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000,32400,7878,8989,8080,8081,9696,8191,5030,8337 -ErrorAction SilentlyContinue | Out-Null
+New-NetFirewallRule -DisplayName "PodMedia Services" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000,3001,32400,7878,8989,8080,9696,8191,5030 -ErrorAction SilentlyContinue | Out-Null
 Write-Host " [✓] Firewall rule configured!" -ForegroundColor Green
 
 # 2. Get Podman WSL2 VM IP & Set Netsh Portproxy
@@ -24,7 +24,7 @@ foreach ($line in $wsl_raw) {
 if ($wsl_ip) {
     Write-Host " [✓] Podman WSL2 VM IP detected: $wsl_ip" -ForegroundColor Green
     netsh interface portproxy reset | Out-Null
-    $ports = @(32400, 7878, 8989, 8080, 9696, 8191, 5030, 8337)
+    $ports = @(3001, 32400, 7878, 8989, 8080, 9696, 8191, 5030)
     foreach ($p in $ports) {
         netsh interface portproxy add v4tov4 listenport=$p listenaddress=0.0.0.0 connectport=$p connectaddress=$wsl_ip | Out-Null
     }

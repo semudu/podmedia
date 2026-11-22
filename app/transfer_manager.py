@@ -95,8 +95,10 @@ class TransferManager:
     def _trigger_plex_scan(self):
         """Notifies Plex to refresh sections so moved files are immediately linked."""
         try:
-            req = urllib.request.Request("http://localhost:32400/library/sections/all/refresh")
-            urllib.request.urlopen(req, timeout=2)
+            import media_watcher
+            headers = media_watcher._plex_headers()
+            req = urllib.request.Request("http://localhost:32400/library/sections/all/refresh", headers=headers)
+            urllib.request.urlopen(req, timeout=3).close()
         except Exception:
             pass
 

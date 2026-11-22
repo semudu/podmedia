@@ -36,8 +36,7 @@ PodMedia/
     │   └── .env.example
     └── tools/
         ├── podman-compose.yml
-        ├── beets/                 # config.yaml.example
-        ├── metube/                # YouTube / web media downloader
+        ├── aurral/                # Music discovery, Flows & single/album downloads
         ├── plextraktsync/         # config.yml.example (Optional Plex <-> Trakt)
         ├── prowlarr/              # Indexer manager
         ├── qbittorrent/           # qBittorrent.conf.example
@@ -60,9 +59,9 @@ PodMedia/
   - `delete_after_rating` — Deletes watched movies from disk & watchlists only *after* you rate them (on **either Plex or Trakt**), ensuring two-way watched & rating sync completes first and protecting re-downloaded favorites via `addedAt`.
   - `delete_after_24h` / `delete_immediate` — Automatic cleanup after watching, while always skipping actively streaming sessions.
 - **Hybrid Local + External Disk Management**: Recognizes external archive drives by hardware serial number (even if drive letters change), transfers local media to external storage in the background with live progress/ETA, supports safe disk sleep (0 RPM) / wake, and cleanly releases mounts on shutdown.
-- **Automated Music Pipeline**: Soulseek (Slskd) and MeTube download audio into `/downloads/music`, where Beets auto-tags via MusicBrainz/Discogs/iTunes and organizes files into `/media/music`.
+- **Automated Music Discovery & Pipeline**: **Aurral** (`:3001`) connects to Plex/Plexamp listening history to generate personalized *Flows*, search & download single tracks or full albums (FLAC via **Slskd** with built-in `yt-dlp` fallback), auto-tag/organize directly into `/media/music`, and upgrade or re-search tracks.
 - **Unified Settings & Auto-Updates**: Edit panel port, watched media policy, sync interval, qBittorrent speed limits, `{tmdb}/{tvdb}` auto-renaming, LAN `AllowedHosts`, Plex advertise IP/hostname/TZ, and Trakt sync options directly from the UI — with automatic restart of affected services and one-click reset to defaults.
-- **Smart Home / Homebridge Ready**: `setup.py` generates symmetric mode scripts (`start_plex` / `stop_plex`, `start_downloads` / `stop_downloads`, `start`, `stop`, `status`) with `.running` state files and Windows Scheduled Tasks for zero-UAC headless triggering.
+- **Smart Home / Homebridge Ready**: `setup.py` generates symmetric mode scripts (`start_plex` / `stop_plex`, `start_downloads` / `stop_downloads`, `start_music` / `stop_music`, `start`, `stop`, `status`) with `.running` state files and Windows Scheduled Tasks for zero-UAC headless triggering.
 - **Rootless & Portable**: Built for Podman & Podman Compose with git-ignored personal configs, tokens, and generated launchers.
 
 ---
@@ -78,9 +77,8 @@ PodMedia/
 | **Prowlarr** | Indexer Management | `9696` |
 | **qBittorrent** | Torrent Download Client | `8080` |
 | **FlareSolverr** | Cloudflare Bypass Proxy | `8191` |
+| **Aurral** | Music Discovery, Flows & Track/Album Downloader | `3001` |
 | **Slskd** | Soulseek FLAC Downloader | `5030` |
-| **MeTube** | YouTube / Web Audio & Video Downloader | `8081` |
-| **Beets** | Music Auto-Tagger & Library Manager | CLI / Auto |
 
 ---
 
@@ -102,7 +100,7 @@ cd PodMedia
 ```bash
 python setup.py
 ```
-*This installs Python dependencies (`pystray`, `Pillow`, `podman-compose`), creates all pipeline & service config directories (`downloads/`, `media/`, `services/tools/*/config`), initializes local templates (`config.properties`, `services/plex/.env`, `slskd.yml`, `beets/config.yaml`, `qBittorrent.conf`, `radarr/config.xml`, `sonarr/config.xml`, `plextraktsync/config.yml`), verifies Podman health, and generates OS-specific launchers (`start`/`stop`/`status` + `plex` & `downloads` mode scripts).*
+*This installs Python dependencies (`pystray`, `Pillow`, `podman-compose`), creates all pipeline & service config directories (`downloads/`, `media/`, `services/tools/*/config`), initializes local templates (`config.properties`, `services/plex/.env`, `slskd.yml`, `qBittorrent.conf`, `radarr/config.xml`, `sonarr/config.xml`, `plextraktsync/config.yml`), verifies Podman health, and generates OS-specific launchers (`start`/`stop`/`status` + `plex` & `downloads` mode scripts).*
 
 ### Step 3: (Optional) Customize Paths & Automation
 Edit the generated `config.properties` (or adjust automation settings later from **Admin → Advanced Application & Service Settings**):
@@ -135,11 +133,11 @@ Once `.pytrakt.json` and `servers.yml` exist in `services/tools/plextraktsync/co
 ### Step 5: Launch & Stop PodMedia
 - **Windows**:
   - Launch dashboard: `.\start.bat` (or double-click `start.bat`)
-  - Control modes directly: `.\start_plex.bat`, `.\stop_plex.bat`, `.\start_downloads.bat`, `.\stop_downloads.bat`
+  - Control modes directly: `.\start_plex.bat`, `.\stop_plex.bat`, `.\start_downloads.bat`, `.\stop_downloads.bat`, `.\start_music.bat`, `.\stop_music.bat`
   - Stop everything & release external drives: `.\stop.bat`
 - **macOS / Linux**:
   - Launch dashboard: `./start.sh`
-  - Control modes directly: `./start_plex.sh`, `./stop_plex.sh`, `./start_downloads.sh`, `./stop_downloads.sh`
+  - Control modes directly: `./start_plex.sh`, `./stop_plex.sh`, `./start_downloads.sh`, `./stop_downloads.sh`, `./start_music.sh`, `./stop_music.sh`
   - Stop everything & release external drives: `./stop.sh`
 
 ### Step 6: Open PodMedia
