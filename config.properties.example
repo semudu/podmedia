@@ -15,3 +15,7 @@ watched_media_action = keep
 disk_wake_policy = media_only
 music_start_slskd = true
 delete_disliked_music = true
+sync_music_ratings = true
+# Optional: enable direct Aurral Favorites/Feedback & ListenBrainz Love/Hate sync from Plexamp ratings
+# aurral_user_api_key =
+# listenbrainz_token =

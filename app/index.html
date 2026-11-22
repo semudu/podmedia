@@ -1764,11 +1764,26 @@
                         </label>
                     </div>
                     <div class="field-toggle" style="grid-column: 1 / -1;">
-                        <span data-i18n="lblDeleteDislikedMusic">Plexamp Beğenilmeyenleri (👎 / ≤ 1★) Otomatik Sil & Dışla</span>
+                        <span data-i18n="lblDeleteDislikedMusic">Plexamp 2★ Altı (👎 / &lt; 2★) Parçaları Otomatik Sil &amp; Dışla</span>
                         <label class="switch sm">
                             <input type="checkbox" id="set-delete-disliked-music" checked>
                             <span class="slider"></span>
                         </label>
+                    </div>
+                    <div class="field-toggle" style="grid-column: 1 / -1;">
+                        <span data-i18n="lblSyncMusicRatings">Plexamp Puanlarını Önerilere Yansıt (≥4★ Favori/Love · &lt;2★ Hate/Dışla)</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-sync-music-ratings" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label for="set-aurral-user-key" data-i18n="lblAurralUserKey">Aurral Kullanıcı API Anahtarı (Favori &amp; Öneri Geri Bildirimi)</label>
+                        <input type="password" id="set-aurral-user-key" autocomplete="off" placeholder="Aurral → Settings → Account → API Key">
+                    </div>
+                    <div class="field">
+                        <label for="set-lb-token" data-i18n="lblLbToken">ListenBrainz User Token (Love / Hate Eşitleme)</label>
+                        <input type="password" id="set-lb-token" autocomplete="off" placeholder="listenbrainz.org/settings/">
                     </div>
                 </div>
 
@@ -1971,7 +1986,11 @@
                 lblSlskdPort: 'Slskd Dinleme Portu',
                 lblSlskdShare: 'Slskd Müzik Paylaşımı (/music)',
                 lblMusicStartSlskd: "Müzik Modunda Slskd'yi (FLAC) de Başlat",
-                lblDeleteDislikedMusic: "Plexamp Beğenilmeyenleri (👎 / ≤ 1★) Otomatik Sil & Dışla",
+                lblDeleteDislikedMusic: "Plexamp 2★ Altı (👎 / < 2★) Parçaları Otomatik Sil & Dışla",
+                lblSyncMusicRatings: "Plexamp Puanlarını Önerilere Yansıt (≥4★ Favori/Love · <2★ Hate/Dışla)",
+                lblAurralUserKey: "Aurral Kullanıcı API Anahtarı (Favori & Öneri Geri Bildirimi)",
+                lblLbToken: "ListenBrainz User Token (Love / Hate Eşitleme)",
+                tokenSavedPlaceholder: "✓ Kayıtlı (değiştirmek için yeni anahtar girin)",
                 plexMusicStubSub: 'Aktif (Müzik / Plexamp · Disk Uykuda)',
                 lblDiskWakePolicy: 'Harici Disk Uyandırma Politikası',
                 optWakeMediaOnly: 'Yalnızca Film/Dizi servisleri başlarken (Önerilen)',
@@ -2124,7 +2143,11 @@
                 lblSlskdPort: 'Slskd Listen Port',
                 lblSlskdShare: 'Share Music Folder (/music) on Slskd',
                 lblMusicStartSlskd: 'Also Start Slskd (FLAC) with Music Mode',
-                lblDeleteDislikedMusic: 'Auto-Delete & Exclude Plexamp Disliked Tracks (👎 / ≤ 1★)',
+                lblDeleteDislikedMusic: 'Auto-Delete & Exclude Plexamp Tracks Below 2★ (👎 / < 2★)',
+                lblSyncMusicRatings: 'Sync Plexamp Ratings to Recommendations (≥4★ Love/Star · <2★ Hate)',
+                lblAurralUserKey: 'Aurral User API Key (Favorites & Discovery Feedback)',
+                lblLbToken: 'ListenBrainz User Token (Love / Hate Sync)',
+                tokenSavedPlaceholder: '✓ Saved (enter a new token to replace)',
                 plexMusicStubSub: 'Active (Music / Plexamp · Disk Asleep)',
                 lblDiskWakePolicy: 'External Disk Wake Policy',
                 optWakeMediaOnly: 'Only when Movie/TV services start (Recommended)',
@@ -3146,6 +3169,17 @@
             document.getElementById('set-disk-wake-policy').value = s.disk_wake_policy ?? 'media_only';
             document.getElementById('set-music-start-slskd').checked = s.music_start_slskd !== false;
             document.getElementById('set-delete-disliked-music').checked = s.delete_disliked_music !== false;
+            document.getElementById('set-sync-music-ratings').checked = s.sync_music_ratings !== false;
+            const aurralKeyEl = document.getElementById('set-aurral-user-key');
+            if (aurralKeyEl) {
+                aurralKeyEl.value = '';
+                aurralKeyEl.placeholder = s.aurral_user_api_key_set ? t('tokenSavedPlaceholder') : 'Aurral → Settings → Account → API Key';
+            }
+            const lbTokEl = document.getElementById('set-lb-token');
+            if (lbTokEl) {
+                lbTokEl.value = '';
+                lbTokEl.placeholder = s.listenbrainz_token_set ? t('tokenSavedPlaceholder') : 'listenbrainz.org/settings/';
+            }
 
             const showSlskd = s.slskd_available !== false;
             document.getElementById('slskd-user-field').style.display = showSlskd ? 'flex' : 'none';
@@ -3224,6 +3258,9 @@
                     disk_wake_policy: document.getElementById('set-disk-wake-policy').value,
                     music_start_slskd: document.getElementById('set-music-start-slskd').checked,
                     delete_disliked_music: document.getElementById('set-delete-disliked-music').checked,
+                    sync_music_ratings: document.getElementById('set-sync-music-ratings').checked,
+                    aurral_user_api_key: (document.getElementById('set-aurral-user-key')?.value || '').trim(),
+                    listenbrainz_token: (document.getElementById('set-lb-token')?.value || '').trim(),
                     slskd_username: document.getElementById('set-slskd-user').value.trim(),
                     slskd_listen_port: parseInt(document.getElementById('set-slskd-port').value, 10) || 50300,
                     slskd_share_music: document.getElementById('set-slskd-share').checked,

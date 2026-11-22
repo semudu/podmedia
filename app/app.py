@@ -271,7 +271,7 @@ class AppHandler(BaseHTTPRequestHandler):
         elif path == '/api/music/cleanup':
             try:
                 import media_watcher
-                res = media_watcher.cleanup_disliked_music_tracks(force_empty_trash=True)
+                res = media_watcher.sync_music_ratings_and_recommendations(force_empty_trash=True)
                 self.send_json(res)
             except Exception as e:
                 self.send_json({"status": "error", "message": str(e)}, 500)

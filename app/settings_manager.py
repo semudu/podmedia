@@ -312,6 +312,9 @@ def get_settings():
         "disk_wake_policy": cfg.get("automation", "disk_wake_policy", fallback="media_only"),
         "music_start_slskd": cfg.getboolean("automation", "music_start_slskd", fallback=True),
         "delete_disliked_music": cfg.getboolean("automation", "delete_disliked_music", fallback=True),
+        "sync_music_ratings": cfg.getboolean("automation", "sync_music_ratings", fallback=True),
+        "aurral_user_api_key_set": bool(cfg.get("automation", "aurral_user_api_key", fallback="").strip()),
+        "listenbrainz_token_set": bool(cfg.get("automation", "listenbrainz_token", fallback="").strip()),
         "slskd_available": slskd_cfg["available"],
         "slskd_username": slskd_cfg["username"],
         "slskd_listen_port": slskd_cfg["listen_port"],
@@ -356,6 +359,7 @@ def save_settings(payload):
         disk_wake = "media_only"
     music_start_slskd = bool(payload.get("music_start_slskd", True))
     delete_disliked_music = bool(payload.get("delete_disliked_music", True))
+    sync_music_ratings = bool(payload.get("sync_music_ratings", True))
 
     cfg.set("server", "port", str(port))
     if not cfg.has_option("paths", "media_dir"):
@@ -370,6 +374,15 @@ def save_settings(payload):
     cfg.set("automation", "disk_wake_policy", disk_wake)
     cfg.set("automation", "music_start_slskd", "true" if music_start_slskd else "false")
     cfg.set("automation", "delete_disliked_music", "true" if delete_disliked_music else "false")
+    cfg.set("automation", "sync_music_ratings", "true" if sync_music_ratings else "false")
+
+    # Preserve existing tokens unless a new non-empty token is entered
+    new_aurral_key = str(payload.get("aurral_user_api_key", "") or "").strip()
+    if new_aurral_key:
+        cfg.set("automation", "aurral_user_api_key", new_aurral_key)
+    new_lb_token = str(payload.get("listenbrainz_token", "") or "").strip()
+    if new_lb_token:
+        cfg.set("automation", "listenbrainz_token", new_lb_token)
 
     with open(CONFIG_PROPERTIES_PATH, "w", encoding="utf-8") as f:
         cfg.write(f)
@@ -377,13 +390,21 @@ def save_settings(payload):
     if port != old_port:
         restart_targets.append("podmedia")
 
-    # Apply live Watchlist interval, watched-media policy & disk sleep policy immediately
+    # Apply live Watchlist interval, watched-media policy & music rating sync immediately
     try:
         import media_watcher
         if media_watcher.watcher_instance:
             media_watcher.watcher_instance.import_list_sync_interval = sync_min * 60
             media_watcher.watcher_instance.watched_media_action = watched_action
             media_watcher.watcher_instance.delete_disliked_music = delete_disliked_music
+            media_watcher.watcher_instance.sync_music_ratings = sync_music_ratings
+        if new_aurral_key or new_lb_token or sync_music_ratings:
+            import threading
+            threading.Thread(
+                target=media_watcher.sync_music_ratings_and_recommendations,
+                kwargs={"delete_disliked": delete_disliked_music, "sync_ratings": sync_music_ratings},
+                daemon=True,
+            ).start()
     except Exception:
         pass
     if disk_wake in ("media_only", "manual"):
@@ -467,6 +488,7 @@ def reset_to_defaults():
         "disk_wake_policy": "media_only",
         "music_start_slskd": True,
         "delete_disliked_music": True,
+        "sync_music_ratings": True,
         "slskd_listen_port": 50300,
         "slskd_share_music": True,
         "dl_limit_mbps": 0,

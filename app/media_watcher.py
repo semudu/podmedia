@@ -40,7 +40,8 @@ class MediaWatcher(threading.Thread):
         self.last_music_cleanup = 0
         self.import_list_sync_interval = self._load_sync_interval()
         self.watched_media_action = self._load_watched_action()
-        self.delete_disliked_music = self._load_delete_disliked_music()
+        self.delete_disliked_music = self._load_bool_automation("delete_disliked_music", True)
+        self.sync_music_ratings = self._load_bool_automation("sync_music_ratings", True)
         self.target_folders = {
             'movies': os.path.join(self.media_dir, 'movies'),
             'series': os.path.join(self.media_dir, 'series'),
@@ -74,17 +75,17 @@ class MediaWatcher(threading.Thread):
             pass
         return "keep"
 
-    def _load_delete_disliked_music(self):
+    def _load_bool_automation(self, key, default=True):
         try:
             import configparser
             cfg = configparser.ConfigParser()
             cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.properties")
             if os.path.exists(cfg_path):
                 cfg.read(cfg_path, encoding="utf-8")
-                return cfg.getboolean("automation", "delete_disliked_music", fallback=True)
+                return cfg.getboolean("automation", key, fallback=default)
         except Exception:
             pass
-        return True
+        return default
 
     def are_containers_running(self):
         """Quickly checks if any PodMedia containers are currently running."""
@@ -272,13 +273,17 @@ class MediaWatcher(threading.Thread):
                 if self.watched_media_action in ("delete_after_rating", "delete_after_24h", "delete_immediate"):
                     threading.Thread(target=cleanup_watched_media, args=(self.watched_media_action,), daemon=True).start()
 
-            # Periodic Plexamp disliked-music cleanup & music hygiene (every 60s, local SSD only)
+            # Periodic Plexamp music rating sync (Aurral + ListenBrainz) & <2★ disliked cleanup (every 60s, local SSD only)
             if now_ts - self.last_music_cleanup >= 60:
                 self.last_music_cleanup = now_ts
-                if self.delete_disliked_music:
+                if self.delete_disliked_music or self.sync_music_ratings:
                     threading.Thread(
-                        target=cleanup_disliked_music_tracks,
-                        kwargs={"music_dir": self.target_folders.get("music")},
+                        target=sync_music_ratings_and_recommendations,
+                        kwargs={
+                            "delete_disliked": self.delete_disliked_music,
+                            "sync_ratings": self.sync_music_ratings,
+                            "music_dir": self.target_folders.get("music"),
+                        },
                         daemon=True,
                     ).start()
 
@@ -1020,40 +1025,253 @@ def cleanup_music_hygiene(music_dir=None):
     return {"tmp_removed": tmp_removed, "dirs_removed": dirs_removed}
 
 
-def _get_aurral_api_key_and_track_id(container_file_path):
-    """Reads Aurral's plaintext general API key and looks up library_tracks.id for a /media/music/... path."""
+def _load_music_automation_config():
+    """Loads music rating/cleanup preferences & optional user tokens from config.properties."""
+    import configparser
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    cfg_path = os.path.join(project_root, "config.properties")
+    res = {
+        "delete_disliked_music": True,
+        "sync_music_ratings": True,
+        "aurral_user_api_key": "",
+        "listenbrainz_token": "",
+    }
+    try:
+        cfg = configparser.ConfigParser()
+        if os.path.exists(cfg_path):
+            cfg.read(cfg_path, encoding="utf-8")
+            res["delete_disliked_music"] = cfg.getboolean("automation", "delete_disliked_music", fallback=True)
+            res["sync_music_ratings"] = cfg.getboolean("automation", "sync_music_ratings", fallback=True)
+            res["aurral_user_api_key"] = cfg.get("automation", "aurral_user_api_key", fallback="").strip()
+            res["listenbrainz_token"] = cfg.get("automation", "listenbrainz_token", fallback="").strip()
+    except Exception:
+        pass
+    return res
+
+
+def _music_ratings_state_path():
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    run_dir = os.path.join(project_root, "run")
+    os.makedirs(run_dir, exist_ok=True)
+    return os.path.join(run_dir, "music_ratings_state.json")
+
+
+def _load_music_ratings_state():
+    import json
+    p = _music_ratings_state_path()
+    default_state = {"tracks": {}, "artist_feedback": {}, "disliked_artists": {}, "mbid_cache": {}}
+    if not os.path.exists(p):
+        return default_state
+    try:
+        with open(p, "r", encoding="utf-8") as f:
+            d = json.load(f)
+        for k, v in default_state.items():
+            if not isinstance(d.get(k), dict):
+                d[k] = dict(v)
+        return d
+    except Exception:
+        return default_state
+
+
+def _save_music_ratings_state(state):
+    import json
+    p = _music_ratings_state_path()
+    try:
+        tmp = p + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(state, f, indent=2, ensure_ascii=False)
+        os.replace(tmp, p)
+    except Exception:
+        pass
+
+
+def _read_aurral_music_catalog():
+    """Reads read-only lookup maps from aurral.db: general API key, path->track info, artist track counts, exclusions."""
     import sqlite3
     import json
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     adb = os.path.join(project_root, "services", "tools", "aurral", "config", "aurral.db")
+    out = {
+        "general_api_key": "",
+        "by_path": {},            # path -> {track_id, identity_key, mbid, title, artist_name, artist_mbid}
+        "artist_counts": {},      # lower(artist_name) -> int available tracks
+        "artist_mbids": {},       # lower(artist_name) -> (artist_name, mbid)
+        "excluded_artists": {},   # lower(artist_name) -> (artist_name, artist_mbid, count)
+    }
     if not os.path.exists(adb):
-        return "", None
+        return out
     con = None
     try:
         con = sqlite3.connect(f"file:{adb}?mode=ro", uri=True, timeout=2.0)
         cur = con.cursor()
-        api_key = ""
         row = cur.execute("SELECT value FROM settings WHERE key='integrations'").fetchone()
         if row and row[0]:
             integ = json.loads(row[0])
             ak = (integ.get("general") or {}).get("apiKey", "")
             if ak and not str(ak).startswith("AURRAL_ENC:"):
-                api_key = str(ak).strip()
+                out["general_api_key"] = str(ak).strip()
 
-        trow = cur.execute(
-            "SELECT track_id FROM library_media_files WHERE path = ? AND available = 1 LIMIT 1",
-            (container_file_path,),
-        ).fetchone()
-        track_id = trow[0] if trow else None
-        return api_key, track_id
+        for aname, ambid in cur.execute("SELECT name, mbid FROM library_artists WHERE name IS NOT NULL").fetchall():
+            k = str(aname).strip().lower()
+            if k:
+                out["artist_mbids"][k] = (str(aname).strip(), str(ambid or "").strip())
+
+        for path, tid, ikey, tmbid, ttitle, tartist, aartist, ambid in cur.execute("""
+            SELECT mf.path, mf.track_id, lt.identity_key, lt.mbid, lt.title, lt.artist_name, la.name, la.mbid
+            FROM library_media_files mf
+            LEFT JOIN library_tracks lt ON mf.track_id = lt.id
+            LEFT JOIN library_albums alb ON mf.album_id = alb.id
+            LEFT JOIN library_artists la ON alb.artist_id = la.id
+            WHERE mf.available = 1
+        """).fetchall():
+            aname = str(aartist or tartist or "").strip()
+            akey = aname.lower()
+            if akey:
+                out["artist_counts"][akey] = out["artist_counts"].get(akey, 0) + 1
+                if ambid and akey not in out["artist_mbids"]:
+                    out["artist_mbids"][akey] = (aname, str(ambid).strip())
+            out["by_path"][path] = {
+                "track_id": tid,
+                "identity_key": str(ikey or "").strip(),
+                "mbid": str(tmbid or "").strip(),
+                "title": str(ttitle or "").strip(),
+                "artist_name": aname,
+                "artist_mbid": str(ambid or "").strip(),
+            }
+
+        for aname, ambid in cur.execute(
+            "SELECT artist_name, artist_mbid FROM library_monitoring_exclusions WHERE artist_name IS NOT NULL AND artist_name != ''"
+        ).fetchall():
+            clean_a = str(aname).strip()
+            k = clean_a.lower()
+            prev = out["excluded_artists"].get(k)
+            cnt = (prev[2] + 1) if prev else 1
+            best_mbid = str(ambid or "").strip() or (prev[1] if prev else "")
+            out["excluded_artists"][k] = (clean_a, best_mbid, cnt)
     except Exception:
-        return "", None
+        pass
     finally:
         if con is not None:
             try:
                 con.close()
             except Exception:
                 pass
+    return out
+
+
+def _lookup_listenbrainz_mbid(artist_name, track_title, state):
+    """Best-effort public ListenBrainz metadata lookup for tracks without an embedded MBID (cached)."""
+    import urllib.parse
+    import json
+    cache_key = f"{artist_name.strip().lower()}::{track_title.strip().lower()}"
+    if cache_key in state["mbid_cache"]:
+        return state["mbid_cache"][cache_key]
+    mbid = ""
+    try:
+        qs = urllib.parse.urlencode({"artist_name": artist_name, "recording_name": track_title})
+        req = urllib.request.Request(
+            f"https://api.listenbrainz.org/1/metadata/lookup/?{qs}",
+            headers={"User-Agent": "PodMedia/1.0", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            d = json.loads(resp.read().decode("utf-8"))
+            mbid = str(d.get("recording_mbid") or "").strip()
+    except Exception:
+        mbid = ""
+    state["mbid_cache"][cache_key] = mbid
+    return mbid
+
+
+def _send_listenbrainz_feedback(token, recording_mbid, score):
+    """Sends official ListenBrainz recording feedback: score in {1 (Love), 0 (Neutral), -1 (Hate)}."""
+    import json
+    if not token or not recording_mbid:
+        return False
+    try:
+        payload = json.dumps({"recording_mbid": recording_mbid, "score": int(score)}).encode("utf-8")
+        req = urllib.request.Request(
+            "https://api.listenbrainz.org/1/feedback/recording-feedback",
+            data=payload,
+            headers={
+                "Authorization": f"Token {token}",
+                "Content-Type": "application/json",
+                "User-Agent": "PodMedia/1.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.status in (200, 201)
+    except Exception as e:
+        print(f"⚠️ [MusicRatings] ListenBrainz feedback failed ({recording_mbid}, score={score}): {e}")
+        return False
+
+
+def _set_aurral_favorite(user_api_key, song_identity_key, starred):
+    """Stars or unstars a track in Aurral Favorites (natural 1.4x recommendation weight) as the user."""
+    import json
+    import urllib.parse
+    if not user_api_key or not song_identity_key:
+        return False
+    try:
+        song_id = "song:" + urllib.parse.quote(song_identity_key, safe="")
+        payload = json.dumps({"ids": [song_id], "starred": bool(starred)}).encode("utf-8")
+        req = urllib.request.Request(
+            "http://127.0.0.1:3001/api/library/favorites",
+            data=payload,
+            headers={"X-Api-Key": user_api_key, "Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.status in (200, 204)
+    except Exception as e:
+        print(f"⚠️ [MusicRatings] Aurral favorite ({starred}) failed for {song_identity_key}: {e}")
+        return False
+
+
+def _add_aurral_artist_less_like_this(user_api_key, artist_name, artist_mbid=""):
+    """Sends surgical artist-only 'less_like_this' (empty tagContext so genres stay natural & undistorted)."""
+    import json
+    if not user_api_key or not artist_name:
+        return None
+    try:
+        body = {
+            "action": "less_like_this",
+            "artistName": artist_name,
+            "sourceContext": "podmedia_plexamp",
+            "tagContext": [],
+            "seedContext": [],
+        }
+        if artist_mbid:
+            body["artistId"] = artist_mbid
+        req = urllib.request.Request(
+            "http://127.0.0.1:3001/api/discovery/feedback",
+            data=json.dumps(body).encode("utf-8"),
+            headers={"X-Api-Key": user_api_key, "Content-Type": "application/json", "Accept": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            data = json.loads(resp.read().decode("utf-8"))
+            fb = data.get("feedback") or {}
+            return fb.get("id") or "synced"
+    except Exception as e:
+        print(f"⚠️ [MusicRatings] Aurral less_like_this failed for {artist_name}: {e}")
+        return None
+
+
+def _remove_aurral_discovery_feedback(user_api_key, feedback_id):
+    """Removes a previously added Aurral discovery feedback entry when the user later likes that artist."""
+    if not user_api_key or not feedback_id or feedback_id == "synced":
+        return False
+    try:
+        req = urllib.request.Request(
+            f"http://127.0.0.1:3001/api/discovery/feedback/{feedback_id}",
+            headers={"X-Api-Key": user_api_key, "Accept": "application/json"},
+            method="DELETE",
+        )
+        with urllib.request.urlopen(req, timeout=8) as resp:
+            return resp.status in (200, 204)
+    except Exception:
+        return False
 
 
 def _is_aurral_online():
@@ -1070,16 +1288,39 @@ def _is_aurral_online():
             return False
 
 
-def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_trash=False):
-    """Finds tracks rated <= max_rating (default 2.0 = 1 star / Thumbs Down in Plexamp) in Plex Music,
-    deletes them cleanly through Aurral API (which also adds a monitoring exclusion so they never re-download),
-    cleans orphaned folders, and refreshes + empties Plex Music trash ONLY (never touching Movies/Series)."""
+def sync_music_ratings_and_recommendations(
+    delete_disliked=None,
+    sync_ratings=None,
+    delete_below_rating=4.0,
+    music_dir=None,
+    force_empty_trash=False,
+):
+    """Natural, algorithm-friendly Plexamp -> Aurral + ListenBrainz rating & recommendation engine:
+    - >= 4★ (8.0-10.0): ListenBrainz Love (+1) + Aurral Favorites star (natural 1.4x boost); clears prior artist less_like_this.
+    - 2★ - 3.5★ (4.0-7.0): Kept on disk; ListenBrainz Neutral (0) if previously non-zero; unstarred in Aurral.
+    - < 2★ (0.5★, 1★, 1.5★ / userRating < 4.0): ListenBrainz Hate (-1), deleted via Aurral API (+monitoring exclusion),
+      Plex Music trash purged, and artist-only 'less_like_this' (tagContext=[], preserving genres!) ONLY if the artist
+      has no remaining library tracks and no loved tracks.
+    """
     if not _music_cleanup_lock.acquire(blocking=False):
-        return {"status": "busy", "deleted": []}
+        return {"status": "busy", "deleted": [], "lb_synced": 0, "aurral_starred": 0, "artist_feedback": 0}
+
     deleted_items = []
+    lb_synced = 0
+    aurral_fav_synced = 0
+    artist_fb_synced = 0
     skipped_aurral_offline = 0
+
     try:
         import json
+        cfg = _load_music_automation_config()
+        if delete_disliked is None:
+            delete_disliked = cfg["delete_disliked_music"]
+        if sync_ratings is None:
+            sync_ratings = cfg["sync_music_ratings"]
+        user_api_key = cfg["aurral_user_api_key"]
+        lb_token = cfg["listenbrainz_token"]
+
         plex_token = _get_plex_token()
         if not plex_token:
             return {"status": "no_plex_token", "deleted": []}
@@ -1090,7 +1331,7 @@ def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_tr
             music_dir = os.path.join(project_root, "media", "music")
         music_dir = os.path.abspath(music_dir)
 
-        # 1. Check active Plex sessions so we never delete a track currently playing
+        # 1. Active Plex sessions (never delete a track currently playing)
         active_keys = set()
         try:
             s_req = urllib.request.Request("http://127.0.0.1:32400/status/sessions", headers=headers)
@@ -1102,12 +1343,10 @@ def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_tr
         except Exception:
             return {"status": "plex_offline", "deleted": []}
 
-        # 2. Locate Plex Music section
         music_sec = _get_plex_section_id("music")
         if not music_sec:
             return {"status": "no_music_section", "deleted": []}
 
-        # 3. Query all tracks in Plex Music library
         t_req = urllib.request.Request(
             f"http://127.0.0.1:32400/library/sections/{music_sec}/all?type=10",
             headers=headers,
@@ -1115,10 +1354,18 @@ def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_tr
         with urllib.request.urlopen(t_req, timeout=10) as tresp:
             tracks = json.loads(tresp.read().decode("utf-8")).get("MediaContainer", {}).get("Metadata", []) or []
 
+        catalog = _read_aurral_music_catalog()
+        state = _load_music_ratings_state()
+        state_dirty = False
         aurral_online = None
+        delete_api_key = user_api_key or catalog["general_api_key"]
+
+        # Track per-artist loved counts from current Plex library
+        artist_loved_counts = {}
+
         for item in tracks:
             rk = str(item.get("ratingKey", ""))
-            if not rk or rk in active_keys:
+            if not rk:
                 continue
             rating = item.get("userRating")
             if rating is None:
@@ -1127,10 +1374,9 @@ def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_tr
                 rating_val = float(rating)
             except Exception:
                 continue
-            if not (0.0 < rating_val <= float(max_rating)):
+            if rating_val <= 0.0:
                 continue
 
-            # Extract file paths from Plex Media Parts
             part_files = []
             for media_obj in item.get("Media") or []:
                 for part in media_obj.get("Part") or []:
@@ -1140,49 +1386,177 @@ def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_tr
             if not part_files:
                 continue
 
-            artist_name = item.get("grandparentTitle") or item.get("originalTitle") or ""
-            track_title = item.get("title") or ""
+            artist_name = str(item.get("grandparentTitle") or item.get("originalTitle") or "").strip()
+            track_title = str(item.get("title") or "").strip()
             label = f"{artist_name} - {track_title}".strip(" -")
+            artist_key = artist_name.lower()
+
+            # Classify rating naturally
+            is_loved = rating_val >= 8.0                      # >= 4★ (4★, 4.5★, 5★)
+            is_disliked = rating_val < float(delete_below_rating)  # < 2★ (0.5★, 1★, 1.5★)
+            desired_lb = 1 if is_loved else (-1 if is_disliked else 0)
+            desired_star = True if is_loved else False
+
+            if is_loved and artist_key:
+                artist_loved_counts[artist_key] = artist_loved_counts.get(artist_key, 0) + 1
 
             for container_path in part_files:
                 rel_path = container_path[len("/media/music/"):].replace("/", os.sep)
                 host_path = os.path.abspath(os.path.join(music_dir, rel_path))
-                # Strict path traversal guard
                 if not host_path.startswith(music_dir + os.sep):
                     continue
 
-                api_key, aurral_track_id = _get_aurral_api_key_and_track_id(container_path)
-                deleted_ok = False
+                aurral_meta = catalog["by_path"].get(container_path) or {}
+                aurral_track_id = aurral_meta.get("track_id")
+                song_ikey = aurral_meta.get("identity_key", "")
+                mbid = aurral_meta.get("mbid", "")
+                eff_artist = aurral_meta.get("artist_name") or artist_name
+                eff_artist_mbid = aurral_meta.get("artist_mbid") or ""
+                eff_artist_key = eff_artist.lower()
 
-                if aurral_track_id is not None and api_key:
+                prev = state["tracks"].get(container_path) or {}
+
+                # A) ListenBrainz Recording Feedback (+1 Love, 0 Neutral if previously non-zero, -1 Hate)
+                if sync_ratings and lb_token:
+                    prev_lb = prev.get("lb_score")
+                    should_send_lb = (desired_lb != 0 and prev_lb != desired_lb) or (desired_lb == 0 and prev_lb in (1, -1))
+                    if should_send_lb:
+                        if not mbid and eff_artist and track_title:
+                            mbid = _lookup_listenbrainz_mbid(eff_artist, track_title, state)
+                            state_dirty = True
+                        if mbid and _send_listenbrainz_feedback(lb_token, mbid, desired_lb):
+                            prev["lb_score"] = desired_lb
+                            prev["mbid"] = mbid
+                            lb_synced += 1
+                            state_dirty = True
+                            print(f"🎵 [MusicRatings] ListenBrainz feedback ({desired_lb:+d}): {label}")
+
+                # B) Aurral Favorites Star (natural 1.4x weight for >= 4★; unstar if downgraded)
+                if sync_ratings and user_api_key and song_ikey and not is_disliked:
+                    prev_star = prev.get("aurral_starred")
+                    should_send_star = (desired_star and prev_star is not True) or (not desired_star and prev_star is True)
+                    if should_send_star:
+                        if aurral_online is None:
+                            aurral_online = _is_aurral_online()
+                        if aurral_online and _set_aurral_favorite(user_api_key, song_ikey, desired_star):
+                            prev["aurral_starred"] = desired_star
+                            aurral_fav_synced += 1
+                            state_dirty = True
+                            print(f"⭐ [MusicRatings] Aurral favorite ({'starred' if desired_star else 'unstarred'}): {label}")
+
+                # Persist rating snapshot for kept tracks
+                if not is_disliked:
+                    if prev.get("rating") != rating_val:
+                        prev["rating"] = rating_val
+                        prev["artist_name"] = eff_artist
+                        prev["track_title"] = track_title
+                        state["tracks"][container_path] = prev
+                        state_dirty = True
+                    continue
+
+                # C) Disliked (< 2★): unstar if starred, then delete & exclude if enabled and not playing
+                if rk in active_keys:
+                    continue
+
+                if user_api_key and song_ikey and prev.get("aurral_starred") is True:
+                    if aurral_online is None:
+                        aurral_online = _is_aurral_online()
+                    if aurral_online:
+                        _set_aurral_favorite(user_api_key, song_ikey, False)
+
+                if not delete_disliked:
+                    prev["rating"] = rating_val
+                    state["tracks"][container_path] = prev
+                    state_dirty = True
+                    continue
+
+                deleted_ok = False
+                if aurral_track_id is not None and delete_api_key:
                     if aurral_online is None:
                         aurral_online = _is_aurral_online()
                     if not aurral_online:
                         skipped_aurral_offline += 1
-                        continue  # Wait until Aurral is running so exclusion is properly saved
+                        continue
                     try:
                         del_req = urllib.request.Request(
                             f"http://127.0.0.1:3001/api/library/tracks/{aurral_track_id}",
-                            headers={"X-Api-Key": api_key, "Accept": "application/json"},
+                            headers={"X-Api-Key": delete_api_key, "Accept": "application/json"},
                             method="DELETE",
                         )
                         with urllib.request.urlopen(del_req, timeout=15) as dresp:
                             if dresp.status in (200, 204):
                                 deleted_ok = True
-                                print(f"👎 [MusicCleanup] Deleted disliked track via Aurral (+excluded, rating={rating_val}): {label}")
+                                print(f"👎 [MusicCleanup] Deleted <2★ track via Aurral (+excluded, rating={rating_val}): {label}")
                     except Exception as e:
                         print(f"⚠️ [MusicCleanup] Aurral delete failed for {label} (id={aurral_track_id}): {e}")
                 elif os.path.exists(host_path):
-                    # Legacy/untracked file not present in Aurral DB — safe direct delete
                     try:
                         os.remove(host_path)
                         deleted_ok = True
-                        print(f"👎 [MusicCleanup] Deleted disliked untracked file (rating={rating_val}): {label}")
+                        print(f"👎 [MusicCleanup] Deleted <2★ untracked file (rating={rating_val}): {label}")
                     except Exception as e:
                         print(f"⚠️ [MusicCleanup] File delete failed for {label}: {e}")
 
                 if deleted_ok:
                     deleted_items.append({"label": label, "rating": rating_val, "path": container_path})
+                    state["tracks"].pop(container_path, None)
+                    if eff_artist_key:
+                        if eff_artist_key in catalog["artist_counts"]:
+                            catalog["artist_counts"][eff_artist_key] = max(0, catalog["artist_counts"][eff_artist_key] - 1)
+                        d_entry = state["disliked_artists"].get(eff_artist_key) or {
+                            "artist_name": eff_artist,
+                            "artist_mbid": eff_artist_mbid,
+                            "count": 0,
+                        }
+                        d_entry["count"] = int(d_entry.get("count", 0)) + 1
+                        if eff_artist_mbid:
+                            d_entry["artist_mbid"] = eff_artist_mbid
+                        state["disliked_artists"][eff_artist_key] = d_entry
+                    state_dirty = True
+
+        # D) Surgical artist-only Aurral Discovery 'less_like_this' (tagContext=[] so genres are never distorted!)
+        #    - Applied ONLY when an artist has disliked/excluded track(s), 0 remaining library tracks, and 0 loved tracks.
+        #    - Automatically removed if the user later loves (>= 4★) any track by that artist.
+        if sync_ratings and user_api_key:
+            # Merge already-excluded artists (e.g. John Coltrane) with state['disliked_artists']
+            candidate_disliked = dict(state["disliked_artists"])
+            for akey, (aname, ambid, cnt) in catalog["excluded_artists"].items():
+                if akey not in candidate_disliked:
+                    candidate_disliked[akey] = {"artist_name": aname, "artist_mbid": ambid, "count": cnt}
+
+            all_artist_keys = set(candidate_disliked.keys()) | set(state["artist_feedback"].keys()) | set(artist_loved_counts.keys())
+            for akey in all_artist_keys:
+                loved_n = artist_loved_counts.get(akey, 0)
+                remaining_n = catalog["artist_counts"].get(akey, 0)
+                is_disliked_artist = akey in candidate_disliked
+                existing_fb = state["artist_feedback"].get(akey)
+
+                want_less = bool(is_disliked_artist and loved_n == 0 and remaining_n == 0)
+                if want_less and not existing_fb:
+                    if aurral_online is None:
+                        aurral_online = _is_aurral_online()
+                    if aurral_online:
+                        info = candidate_disliked[akey]
+                        aname = info.get("artist_name") or catalog["artist_mbids"].get(akey, (akey, ""))[0]
+                        ambid = info.get("artist_mbid") or catalog["artist_mbids"].get(akey, ("", ""))[1]
+                        fb_id = _add_aurral_artist_less_like_this(user_api_key, aname, ambid)
+                        if fb_id:
+                            state["artist_feedback"][akey] = {"action": "less_like_this", "feedback_id": fb_id, "artist_name": aname}
+                            artist_fb_synced += 1
+                            state_dirty = True
+                            print(f"🎯 [MusicRatings] Aurral discovery 'less_like_this' (artist-only): {aname}")
+                elif not want_less and existing_fb and loved_n > 0:
+                    if aurral_online is None:
+                        aurral_online = _is_aurral_online()
+                    if aurral_online:
+                        _remove_aurral_discovery_feedback(user_api_key, existing_fb.get("feedback_id"))
+                        state["artist_feedback"].pop(akey, None)
+                        artist_fb_synced += 1
+                        state_dirty = True
+                        print(f"🎯 [MusicRatings] Cleared Aurral 'less_like_this' after >=4★ rating: {existing_fb.get('artist_name', akey)}")
+
+        if state_dirty:
+            _save_music_ratings_state(state)
 
         hygiene = cleanup_music_hygiene(music_dir)
         if deleted_items or force_empty_trash or hygiene["dirs_removed"] or hygiene["tmp_removed"]:
@@ -1198,14 +1572,28 @@ def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_tr
         return {
             "status": "ok",
             "deleted": deleted_items,
+            "lb_synced": lb_synced,
+            "aurral_favorites_synced": aurral_fav_synced,
+            "artist_feedback_synced": artist_fb_synced,
             "skipped_aurral_offline": skipped_aurral_offline,
+            "has_listenbrainz_token": bool(lb_token),
+            "has_aurral_user_key": bool(user_api_key),
             "hygiene": hygiene,
         }
     except Exception as e:
-        print(f"⚠️ [MusicCleanup] Skipped: {e}")
+        print(f"⚠️ [MusicRatings] Skipped: {e}")
         return {"status": "error", "error": str(e), "deleted": deleted_items}
     finally:
         _music_cleanup_lock.release()
+
+
+def cleanup_disliked_music_tracks(max_rating=3.9, music_dir=None, force_empty_trash=False):
+    """Backward-compatible wrapper invoking the unified music rating sync & <2★ cleanup engine."""
+    return sync_music_ratings_and_recommendations(
+        delete_below_rating=float(max_rating) + 0.1 if float(max_rating) < 4.0 else float(max_rating),
+        music_dir=music_dir,
+        force_empty_trash=force_empty_trash,
+    )
 
 
 watcher_instance = None
