@@ -1763,6 +1763,13 @@
                             <span class="slider"></span>
                         </label>
                     </div>
+                    <div class="field-toggle" style="grid-column: 1 / -1;">
+                        <span data-i18n="lblDeleteDislikedMusic">Plexamp Beğenilmeyenleri (👎 / ≤ 1★) Otomatik Sil & Dışla</span>
+                        <label class="switch sm">
+                            <input type="checkbox" id="set-delete-disliked-music" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="settings-group-title" data-i18n="setGroupSystem">🛠️ Sistem</div>
@@ -1964,6 +1971,7 @@
                 lblSlskdPort: 'Slskd Dinleme Portu',
                 lblSlskdShare: 'Slskd Müzik Paylaşımı (/music)',
                 lblMusicStartSlskd: "Müzik Modunda Slskd'yi (FLAC) de Başlat",
+                lblDeleteDislikedMusic: "Plexamp Beğenilmeyenleri (👎 / ≤ 1★) Otomatik Sil & Dışla",
                 plexMusicStubSub: 'Aktif (Müzik / Plexamp · Disk Uykuda)',
                 lblDiskWakePolicy: 'Harici Disk Uyandırma Politikası',
                 optWakeMediaOnly: 'Yalnızca Film/Dizi servisleri başlarken (Önerilen)',
@@ -2116,6 +2124,7 @@
                 lblSlskdPort: 'Slskd Listen Port',
                 lblSlskdShare: 'Share Music Folder (/music) on Slskd',
                 lblMusicStartSlskd: 'Also Start Slskd (FLAC) with Music Mode',
+                lblDeleteDislikedMusic: 'Auto-Delete & Exclude Plexamp Disliked Tracks (👎 / ≤ 1★)',
                 plexMusicStubSub: 'Active (Music / Plexamp · Disk Asleep)',
                 lblDiskWakePolicy: 'External Disk Wake Policy',
                 optWakeMediaOnly: 'Only when Movie/TV services start (Recommended)',
@@ -3136,6 +3145,7 @@
             document.getElementById('set-auto-update').checked = !!s.auto_update_enabled;
             document.getElementById('set-disk-wake-policy').value = s.disk_wake_policy ?? 'media_only';
             document.getElementById('set-music-start-slskd').checked = s.music_start_slskd !== false;
+            document.getElementById('set-delete-disliked-music').checked = s.delete_disliked_music !== false;
 
             const showSlskd = s.slskd_available !== false;
             document.getElementById('slskd-user-field').style.display = showSlskd ? 'flex' : 'none';
@@ -3213,6 +3223,7 @@
                     auto_update_enabled: document.getElementById('set-auto-update').checked,
                     disk_wake_policy: document.getElementById('set-disk-wake-policy').value,
                     music_start_slskd: document.getElementById('set-music-start-slskd').checked,
+                    delete_disliked_music: document.getElementById('set-delete-disliked-music').checked,
                     slskd_username: document.getElementById('set-slskd-user').value.trim(),
                     slskd_listen_port: parseInt(document.getElementById('set-slskd-port').value, 10) || 50300,
                     slskd_share_music: document.getElementById('set-slskd-share').checked,

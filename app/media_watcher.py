@@ -37,8 +37,10 @@ class MediaWatcher(threading.Thread):
         self.snapshots = {}
         self.fast_signatures = {}
         self.last_import_list_sync = 0
+        self.last_music_cleanup = 0
         self.import_list_sync_interval = self._load_sync_interval()
         self.watched_media_action = self._load_watched_action()
+        self.delete_disliked_music = self._load_delete_disliked_music()
         self.target_folders = {
             'movies': os.path.join(self.media_dir, 'movies'),
             'series': os.path.join(self.media_dir, 'series'),
@@ -72,6 +74,18 @@ class MediaWatcher(threading.Thread):
             pass
         return "keep"
 
+    def _load_delete_disliked_music(self):
+        try:
+            import configparser
+            cfg = configparser.ConfigParser()
+            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.properties")
+            if os.path.exists(cfg_path):
+                cfg.read(cfg_path, encoding="utf-8")
+                return cfg.getboolean("automation", "delete_disliked_music", fallback=True)
+        except Exception:
+            pass
+        return True
+
     def are_containers_running(self):
         """Quickly checks if any PodMedia containers are currently running."""
         try:
@@ -80,9 +94,9 @@ class MediaWatcher(threading.Thread):
         except Exception:
             return False
 
-    def get_fast_signature(self, path):
-        """Lightweight non-recursive signature based on root and immediate child directory mtimes.
-        Takes < 1ms and avoids keeping mechanical external disks spinning with constant recursive walks."""
+    def get_fast_signature(self, path, depth=1):
+        """Lightweight signature based on root and child directory mtimes.
+        depth=1 avoids spinning mechanical external disks; depth=2 for local SSD music catches Artist/Album upgrades."""
         if not os.path.exists(path):
             return None
         try:
@@ -93,6 +107,14 @@ class MediaWatcher(threading.Thread):
                     try:
                         s = entry.stat()
                         sig.append((entry.name, s.st_mtime, s.st_size if entry.is_file() else 0))
+                        if depth >= 2 and entry.is_dir():
+                            with os.scandir(entry.path) as sub_it:
+                                for sub in sub_it:
+                                    try:
+                                        ss = sub.stat()
+                                        sig.append((entry.name + "/" + sub.name, ss.st_mtime, ss.st_size if sub.is_file() else 0))
+                                    except Exception:
+                                        pass
                     except Exception:
                         pass
             return tuple(sig)
@@ -222,7 +244,7 @@ class MediaWatcher(threading.Thread):
         trigger_plex_full_scan_on_startup()
 
         for cat, path in self.target_folders.items():
-            self.fast_signatures[cat] = self.get_fast_signature(path)
+            self.fast_signatures[cat] = self.get_fast_signature(path, depth=2 if cat == 'music' else 1)
             self.snapshots[cat] = self.get_folder_snapshot(path)
 
         last_ext_connected = False
@@ -249,6 +271,16 @@ class MediaWatcher(threading.Thread):
                 threading.Thread(target=sync_trakt_and_import_lists, daemon=True).start()
                 if self.watched_media_action in ("delete_after_rating", "delete_after_24h", "delete_immediate"):
                     threading.Thread(target=cleanup_watched_media, args=(self.watched_media_action,), daemon=True).start()
+
+            # Periodic Plexamp disliked-music cleanup & music hygiene (every 60s, local SSD only)
+            if now_ts - self.last_music_cleanup >= 60:
+                self.last_music_cleanup = now_ts
+                if self.delete_disliked_music:
+                    threading.Thread(
+                        target=cleanup_disliked_music_tracks,
+                        kwargs={"music_dir": self.target_folders.get("music")},
+                        daemon=True,
+                    ).start()
 
             # Dynamically update external disk paths (only when a container actually mounts the external disk)
             try:
@@ -281,8 +313,9 @@ class MediaWatcher(threading.Thread):
                     # Skip without triggering false deletion scan in Plex!
                     continue
 
-                # Ultra-fast non-recursive signature check (< 1ms, zero deep disk traversal)
-                current_fast_sig = self.get_fast_signature(path)
+                # Fast signature check (depth=2 for local SSD music to catch Artist/Album upgrades)
+                sig_depth = 2 if cat == 'music' else 1
+                current_fast_sig = self.get_fast_signature(path, depth=sig_depth)
                 last_fast_sig = self.fast_signatures.get(cat)
 
                 if current_fast_sig == last_fast_sig and current_fast_sig is not None:
@@ -295,36 +328,106 @@ class MediaWatcher(threading.Thread):
                 
                 if current_snapshot != last_snapshot:
                     settled_snapshot = self.wait_for_copy_completion(cat, path)
+                    if cat == 'music':
+                        cleanup_music_hygiene(path)
+                        settled_snapshot = self.get_folder_snapshot(path)
                     self.snapshots[cat] = settled_snapshot
-                    self.fast_signatures[cat] = self.get_fast_signature(path)
+                    self.fast_signatures[cat] = self.get_fast_signature(path, depth=sig_depth)
                     plex_cat = cat.replace('_ext', '')
                     
-                    # Refresh Plex library and clean up trash so deleted media disappears instantly
+                    # Refresh Plex library; for Music (local SSD), run delayed emptyTrash after scan settles
+                    # so upgraded/deleted tracks never linger as ghost duplicates in Plexamp.
                     self.trigger_plex_refresh(plex_cat)
-                    self.trigger_plex_empty_trash(plex_cat)
+                    if plex_cat == 'music':
+                        schedule_plex_empty_trash('music', delay=8)
+                    else:
+                        # Only empty trash for movies/series when external disk is actually mounted & online
+                        try:
+                            import podman_manager
+                            if podman_manager.get_plex_disk_mode() != 'stub':
+                                schedule_plex_empty_trash(plex_cat, delay=8)
+                        except Exception:
+                            pass
 
                     # Synchronize Radarr and Sonarr so deleted items are unmonitored and never re-downloaded
-                    try:
-                        import radarr_sonarr_sync
-                        radarr_sonarr_sync.sync_all()
-                    except Exception as e:
-                        print("Sync error during watcher event:", e)
+                    if plex_cat in ('movies', 'series'):
+                        try:
+                            import radarr_sonarr_sync
+                            radarr_sonarr_sync.sync_all()
+                        except Exception as e:
+                            print("Sync error during watcher event:", e)
 
     def stop(self):
         self.running = False
 
+def schedule_plex_empty_trash(category, delay=8):
+    """Empties Plex trash for a single section AFTER scan finishes so upgraded/deleted tracks disappear cleanly."""
+    def _worker():
+        time.sleep(max(1, delay))
+        try:
+            sec_id = _get_plex_section_id(category)
+            if not sec_id:
+                return
+            url = f"http://127.0.0.1:32400/library/sections/{sec_id}/emptyTrash"
+            req = urllib.request.Request(url, headers=_plex_headers(), method='PUT')
+            urllib.request.urlopen(req, timeout=5).close()
+            print(f"🧹 [MediaWatcher] Emptied Plex '{category}' trash (section {sec_id}).")
+        except Exception:
+            pass
+    threading.Thread(target=_worker, daemon=True).start()
+
+
+def _get_plex_section_id(category):
+    try:
+        req = urllib.request.Request("http://127.0.0.1:32400/library/sections", headers=_plex_headers())
+        with urllib.request.urlopen(req, timeout=3) as resp:
+            root = ET.fromstring(resp.read())
+            for directory in root.findall('Directory'):
+                sec_id = directory.attrib.get('key')
+                sec_type = directory.attrib.get('type')
+                if category == 'movies' and sec_type == 'movie':
+                    return sec_id
+                if category == 'series' and sec_type in ('show', 'series'):
+                    return sec_id
+                if category == 'music' and sec_type in ('artist', 'music'):
+                    return sec_id
+    except Exception:
+        pass
+    return None
+
+
 def trigger_plex_full_scan_on_startup():
-    """Waits asynchronously for Plex Web server startup, then triggers a full scan of all libraries."""
+    """Waits asynchronously for Plex Web server startup, then scans active libraries.
+    When Plex runs in disk-free stub mode (Music/Plexamp), scans & purges trash ONLY for Music."""
     def _worker():
         for _ in range(15):
             time.sleep(2)
             try:
-                url = "http://localhost:32400/library/sections/all/refresh"
-                req = urllib.request.Request(url, headers=_plex_headers())
-                with urllib.request.urlopen(req, timeout=3) as resp:
-                    if resp.status == 200:
-                        print("🚀 [Plex Startup] Triggered full library scan for all sections on Plex startup.")
-                        return
+                stub_mode = False
+                try:
+                    import podman_manager
+                    stub_mode = (podman_manager.get_plex_disk_mode() == 'stub')
+                except Exception:
+                    pass
+                if stub_mode:
+                    sec_id = _get_plex_section_id('music')
+                    if not sec_id:
+                        continue
+                    url = f"http://127.0.0.1:32400/library/sections/{sec_id}/refresh"
+                    req = urllib.request.Request(url, headers=_plex_headers())
+                    with urllib.request.urlopen(req, timeout=3) as resp:
+                        if resp.status == 200:
+                            print("🚀 [Plex Startup] Triggered Music section scan (stub mode).")
+                            schedule_plex_empty_trash('music', delay=10)
+                            return
+                else:
+                    url = "http://127.0.0.1:32400/library/sections/all/refresh"
+                    req = urllib.request.Request(url, headers=_plex_headers())
+                    with urllib.request.urlopen(req, timeout=3) as resp:
+                        if resp.status == 200:
+                            print("🚀 [Plex Startup] Triggered full library scan for all sections on Plex startup.")
+                            schedule_plex_empty_trash('music', delay=10)
+                            return
             except Exception:
                 pass
 
@@ -841,6 +944,268 @@ def cleanup_watched_media(mode="keep"):
         print(f"⚠️ [WatchedCleanup] Skipped: {e}")
     finally:
         _watched_cleanup_lock.release()
+
+
+_music_cleanup_lock = threading.Lock()
+_AUDIO_EXTS = {'.flac', '.mp3', '.m4a', '.ogg', '.opus', '.wav', '.aac', '.wma', '.alac', '.aiff', '.webm'}
+_JUNK_FILES = {'cover.jpg', 'cover.png', 'cover.webp', 'folder.jpg', 'folder.png', 'thumbs.db', '.ds_store', 'desktop.ini'}
+
+
+def cleanup_music_hygiene(music_dir=None):
+    """Removes stale Aurral .tmp import leftovers, orphaned cover-only 'Unknown Album' folders,
+    and completely empty folders under media/music (never touches _playlists or audio files)."""
+    if not music_dir:
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        music_dir = os.path.join(project_root, "media", "music")
+    music_dir = os.path.abspath(music_dir)
+    if not os.path.isdir(music_dir):
+        return {"tmp_removed": 0, "dirs_removed": 0}
+
+    now_ts = time.time()
+    tmp_removed = 0
+    dirs_removed = 0
+
+    for root, dirs, files in os.walk(music_dir, topdown=False):
+        rel = os.path.relpath(root, music_dir)
+        if rel == '.' or rel.split(os.sep)[0].lower() == '_playlists':
+            continue
+
+        # 1. Remove stale .aurral-import-*.tmp files older than 10 minutes
+        for f in list(files):
+            if f.startswith('.aurral-import-') and f.endswith('.tmp'):
+                fp = os.path.join(root, f)
+                try:
+                    if now_ts - os.path.getmtime(fp) > 600:
+                        os.remove(fp)
+                        tmp_removed += 1
+                except Exception:
+                    pass
+
+        # 2. Check current directory contents
+        try:
+            remaining = os.listdir(root)
+        except Exception:
+            continue
+
+        base_lower = os.path.basename(root).lower()
+        if not remaining:
+            try:
+                os.rmdir(root)
+                dirs_removed += 1
+            except Exception:
+                pass
+        elif base_lower == 'unknown album':
+            # Only delete Unknown Album folder if it contains NO subdirectories and NO audio files
+            has_audio_or_subdir = False
+            for item in remaining:
+                ip = os.path.join(root, item)
+                if os.path.isdir(ip):
+                    has_audio_or_subdir = True
+                    break
+                ext = os.path.splitext(item)[1].lower()
+                if ext in _AUDIO_EXTS or item.lower() not in _JUNK_FILES:
+                    has_audio_or_subdir = True
+                    break
+            if not has_audio_or_subdir:
+                try:
+                    for item in remaining:
+                        os.remove(os.path.join(root, item))
+                    os.rmdir(root)
+                    dirs_removed += 1
+                except Exception:
+                    pass
+
+    if tmp_removed or dirs_removed:
+        print(f"🧹 [MusicHygiene] Cleaned {tmp_removed} stale .tmp file(s) and {dirs_removed} empty/orphan folder(s).")
+    return {"tmp_removed": tmp_removed, "dirs_removed": dirs_removed}
+
+
+def _get_aurral_api_key_and_track_id(container_file_path):
+    """Reads Aurral's plaintext general API key and looks up library_tracks.id for a /media/music/... path."""
+    import sqlite3
+    import json
+    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    adb = os.path.join(project_root, "services", "tools", "aurral", "config", "aurral.db")
+    if not os.path.exists(adb):
+        return "", None
+    con = None
+    try:
+        con = sqlite3.connect(f"file:{adb}?mode=ro", uri=True, timeout=2.0)
+        cur = con.cursor()
+        api_key = ""
+        row = cur.execute("SELECT value FROM settings WHERE key='integrations'").fetchone()
+        if row and row[0]:
+            integ = json.loads(row[0])
+            ak = (integ.get("general") or {}).get("apiKey", "")
+            if ak and not str(ak).startswith("AURRAL_ENC:"):
+                api_key = str(ak).strip()
+
+        trow = cur.execute(
+            "SELECT track_id FROM library_media_files WHERE path = ? AND available = 1 LIMIT 1",
+            (container_file_path,),
+        ).fetchone()
+        track_id = trow[0] if trow else None
+        return api_key, track_id
+    except Exception:
+        return "", None
+    finally:
+        if con is not None:
+            try:
+                con.close()
+            except Exception:
+                pass
+
+
+def _is_aurral_online():
+    try:
+        req = urllib.request.Request("http://127.0.0.1:3001/api/health")
+        with urllib.request.urlopen(req, timeout=2) as resp:
+            return resp.status < 500
+    except Exception:
+        try:
+            req = urllib.request.Request("http://127.0.0.1:3001/")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                return resp.status < 500
+        except Exception:
+            return False
+
+
+def cleanup_disliked_music_tracks(max_rating=2.0, music_dir=None, force_empty_trash=False):
+    """Finds tracks rated <= max_rating (default 2.0 = 1 star / Thumbs Down in Plexamp) in Plex Music,
+    deletes them cleanly through Aurral API (which also adds a monitoring exclusion so they never re-download),
+    cleans orphaned folders, and refreshes + empties Plex Music trash ONLY (never touching Movies/Series)."""
+    if not _music_cleanup_lock.acquire(blocking=False):
+        return {"status": "busy", "deleted": []}
+    deleted_items = []
+    skipped_aurral_offline = 0
+    try:
+        import json
+        plex_token = _get_plex_token()
+        if not plex_token:
+            return {"status": "no_plex_token", "deleted": []}
+        headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
+
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        if not music_dir:
+            music_dir = os.path.join(project_root, "media", "music")
+        music_dir = os.path.abspath(music_dir)
+
+        # 1. Check active Plex sessions so we never delete a track currently playing
+        active_keys = set()
+        try:
+            s_req = urllib.request.Request("http://127.0.0.1:32400/status/sessions", headers=headers)
+            with urllib.request.urlopen(s_req, timeout=4) as sresp:
+                sdata = json.loads(sresp.read().decode("utf-8"))
+                for m in sdata.get("MediaContainer", {}).get("Metadata", []) or []:
+                    if m.get("ratingKey"):
+                        active_keys.add(str(m["ratingKey"]))
+        except Exception:
+            return {"status": "plex_offline", "deleted": []}
+
+        # 2. Locate Plex Music section
+        music_sec = _get_plex_section_id("music")
+        if not music_sec:
+            return {"status": "no_music_section", "deleted": []}
+
+        # 3. Query all tracks in Plex Music library
+        t_req = urllib.request.Request(
+            f"http://127.0.0.1:32400/library/sections/{music_sec}/all?type=10",
+            headers=headers,
+        )
+        with urllib.request.urlopen(t_req, timeout=10) as tresp:
+            tracks = json.loads(tresp.read().decode("utf-8")).get("MediaContainer", {}).get("Metadata", []) or []
+
+        aurral_online = None
+        for item in tracks:
+            rk = str(item.get("ratingKey", ""))
+            if not rk or rk in active_keys:
+                continue
+            rating = item.get("userRating")
+            if rating is None:
+                continue
+            try:
+                rating_val = float(rating)
+            except Exception:
+                continue
+            if not (0.0 < rating_val <= float(max_rating)):
+                continue
+
+            # Extract file paths from Plex Media Parts
+            part_files = []
+            for media_obj in item.get("Media") or []:
+                for part in media_obj.get("Part") or []:
+                    fp = part.get("file")
+                    if fp and fp.startswith("/media/music/"):
+                        part_files.append(fp)
+            if not part_files:
+                continue
+
+            artist_name = item.get("grandparentTitle") or item.get("originalTitle") or ""
+            track_title = item.get("title") or ""
+            label = f"{artist_name} - {track_title}".strip(" -")
+
+            for container_path in part_files:
+                rel_path = container_path[len("/media/music/"):].replace("/", os.sep)
+                host_path = os.path.abspath(os.path.join(music_dir, rel_path))
+                # Strict path traversal guard
+                if not host_path.startswith(music_dir + os.sep):
+                    continue
+
+                api_key, aurral_track_id = _get_aurral_api_key_and_track_id(container_path)
+                deleted_ok = False
+
+                if aurral_track_id is not None and api_key:
+                    if aurral_online is None:
+                        aurral_online = _is_aurral_online()
+                    if not aurral_online:
+                        skipped_aurral_offline += 1
+                        continue  # Wait until Aurral is running so exclusion is properly saved
+                    try:
+                        del_req = urllib.request.Request(
+                            f"http://127.0.0.1:3001/api/library/tracks/{aurral_track_id}",
+                            headers={"X-Api-Key": api_key, "Accept": "application/json"},
+                            method="DELETE",
+                        )
+                        with urllib.request.urlopen(del_req, timeout=15) as dresp:
+                            if dresp.status in (200, 204):
+                                deleted_ok = True
+                                print(f"👎 [MusicCleanup] Deleted disliked track via Aurral (+excluded, rating={rating_val}): {label}")
+                    except Exception as e:
+                        print(f"⚠️ [MusicCleanup] Aurral delete failed for {label} (id={aurral_track_id}): {e}")
+                elif os.path.exists(host_path):
+                    # Legacy/untracked file not present in Aurral DB — safe direct delete
+                    try:
+                        os.remove(host_path)
+                        deleted_ok = True
+                        print(f"👎 [MusicCleanup] Deleted disliked untracked file (rating={rating_val}): {label}")
+                    except Exception as e:
+                        print(f"⚠️ [MusicCleanup] File delete failed for {label}: {e}")
+
+                if deleted_ok:
+                    deleted_items.append({"label": label, "rating": rating_val, "path": container_path})
+
+        hygiene = cleanup_music_hygiene(music_dir)
+        if deleted_items or force_empty_trash or hygiene["dirs_removed"] or hygiene["tmp_removed"]:
+            try:
+                urllib.request.urlopen(
+                    urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{music_sec}/refresh", headers=_plex_headers()),
+                    timeout=5,
+                ).close()
+            except Exception:
+                pass
+            schedule_plex_empty_trash("music", delay=6)
+
+        return {
+            "status": "ok",
+            "deleted": deleted_items,
+            "skipped_aurral_offline": skipped_aurral_offline,
+            "hygiene": hygiene,
+        }
+    except Exception as e:
+        print(f"⚠️ [MusicCleanup] Skipped: {e}")
+        return {"status": "error", "error": str(e), "deleted": deleted_items}
+    finally:
+        _music_cleanup_lock.release()
 
 
 watcher_instance = None

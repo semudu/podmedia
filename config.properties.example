@@ -14,3 +14,4 @@ auto_update_enabled = true
 watched_media_action = keep
 disk_wake_policy = media_only
 music_start_slskd = true
+delete_disliked_music = true

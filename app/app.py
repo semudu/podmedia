@@ -268,6 +268,14 @@ class AppHandler(BaseHTTPRequestHandler):
                 "external_disk": ext_disk
             })
 
+        elif path == '/api/music/cleanup':
+            try:
+                import media_watcher
+                res = media_watcher.cleanup_disliked_music_tracks(force_empty_trash=True)
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 500)
+
         elif path == '/api/trakt/sync':
             if not podman_manager.is_plextraktsync_configured():
                 self.send_json({"status": "error", "message": "PlexTraktSync henüz kurulmamış."})
