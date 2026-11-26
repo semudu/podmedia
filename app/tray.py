@@ -105,7 +105,7 @@ class PodMediaTrayApp:
         webbrowser.open("http://localhost:32400/web")
 
     def open_aurral(self, icon=None, item=None):
-        webbrowser.open("http://localhost:3001")
+        webbrowser.open("http://127.0.0.1:3001")
 
     def toggle_mode(self, mode):
         def _handler(icon=None, item=None):

@@ -6,8 +6,9 @@ Write-Host "  PodMedia - Fixing Local & Network Access" -ForegroundColor Cyan
 Write-Host "==================================================" -ForegroundColor Cyan
 Write-Host ""
 
-# 1. Add Windows Firewall Rule
+# 1. Add Windows Firewall Rule (replace any stale rule missing new ports like Aurral 3001)
 Write-Host "[1/2] Setting Windows Firewall Rules..." -ForegroundColor Yellow
+Remove-NetFirewallRule -DisplayName "PodMedia Services" -ErrorAction SilentlyContinue | Out-Null
 New-NetFirewallRule -DisplayName "PodMedia Services" -Direction Inbound -Action Allow -Protocol TCP -LocalPort 3000,3001,32400,7878,8989,8080,9696,8191,5030 -ErrorAction SilentlyContinue | Out-Null
 Write-Host " [✓] Firewall rule configured!" -ForegroundColor Green
 

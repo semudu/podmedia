@@ -522,8 +522,16 @@ def add_media_item(media_type, item_id):
         key = radarr_sonarr_sync._get_api_key(os.path.join(radarr_sonarr_sync.RADARR_DIR, "config.xml"))
         if not key or not radarr_sonarr_sync._is_service_online("http://127.0.0.1:7878", key):
             return {"status": "error", "message": "İndirme Modu (Radarr) şu an kapalı."}
+        radarr_sonarr_sync.unexclude_media("movie", item_id_int)
         existing = radarr_sonarr_sync._api_request("http://127.0.0.1:7878", key, f"/api/v3/movie?tmdbId={item_id_int}", timeout=5)
         if existing:
+            m_obj = existing[0]
+            if not m_obj.get("hasFile"):
+                m_obj["monitored"] = True
+                radarr_sonarr_sync._api_request("http://127.0.0.1:7878", key, f"/api/v3/movie/{m_obj['id']}", method="PUT", payload=m_obj, timeout=6)
+                radarr_sonarr_sync.trigger_radarr_command("MoviesSearch", {"movieIds": [m_obj["id"]]})
+                _summary_cache["ts"] = 0
+                return {"status": "ok", "title": m_obj.get("title", "")}
             return {"status": "ok", "message": "Zaten kütüphanede mevcut."}
         lists = radarr_sonarr_sync._api_request("http://127.0.0.1:7878", key, "/api/v3/importlist", timeout=5) or []
         q_id = lists[0].get("qualityProfileId") if lists else None
@@ -542,6 +550,7 @@ def add_media_item(media_type, item_id):
         lookup["monitored"] = True
         lookup["addOptions"] = {"monitor": "movieOnly", "searchForMovie": True}
         radarr_sonarr_sync._api_request("http://127.0.0.1:7878", key, "/api/v3/movie", method="POST", payload=lookup, timeout=15)
+        radarr_sonarr_sync.reconcile_arr_deletions()
         _summary_cache["ts"] = 0
         return {"status": "ok", "title": lookup.get("title", "")}
 
@@ -549,8 +558,17 @@ def add_media_item(media_type, item_id):
         key = radarr_sonarr_sync._get_api_key(os.path.join(radarr_sonarr_sync.SONARR_DIR, "config.xml"))
         if not key or not radarr_sonarr_sync._is_service_online("http://127.0.0.1:8989", key):
             return {"status": "error", "message": "İndirme Modu (Sonarr) şu an kapalı."}
+        radarr_sonarr_sync.unexclude_media("show", item_id_int)
         existing = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", key, f"/api/v3/series?tvdbId={item_id_int}", timeout=5)
         if existing:
+            s_obj = existing[0]
+            stats = s_obj.get("statistics") or {}
+            if (stats.get("episodeFileCount") or 0) == 0:
+                s_obj["monitored"] = True
+                radarr_sonarr_sync._api_request("http://127.0.0.1:8989", key, f"/api/v3/series/{s_obj['id']}", method="PUT", payload=s_obj, timeout=6)
+                radarr_sonarr_sync.trigger_sonarr_command("SeriesSearch", {"seriesId": s_obj["id"]})
+                _summary_cache["ts"] = 0
+                return {"status": "ok", "title": s_obj.get("title", "")}
             return {"status": "ok", "message": "Zaten kütüphanede mevcut."}
         lists = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", key, "/api/v3/importlist", timeout=5) or []
         q_id = lists[0].get("qualityProfileId") if lists else None
@@ -570,6 +588,7 @@ def add_media_item(media_type, item_id):
         lookup["monitored"] = True
         lookup["addOptions"] = {"searchForMissingEpisodes": True}
         radarr_sonarr_sync._api_request("http://127.0.0.1:8989", key, "/api/v3/series", method="POST", payload=lookup, timeout=15)
+        radarr_sonarr_sync.reconcile_arr_deletions()
         _summary_cache["ts"] = 0
         return {"status": "ok", "title": lookup.get("title", "")}
 

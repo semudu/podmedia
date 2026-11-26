@@ -42,6 +42,8 @@ class MediaWatcher(threading.Thread):
         self.watched_media_action = self._load_watched_action()
         self.delete_disliked_music = self._load_bool_automation("delete_disliked_music", True)
         self.sync_music_ratings = self._load_bool_automation("sync_music_ratings", True)
+        self.music_discovery_schedule = self._load_str_automation("music_discovery_schedule", "weekly")
+        self.music_discovery_size = self._load_int_automation("music_discovery_size", 20, 5, 50)
         self.target_folders = {
             'movies': os.path.join(self.media_dir, 'movies'),
             'series': os.path.join(self.media_dir, 'series'),
@@ -83,6 +85,33 @@ class MediaWatcher(threading.Thread):
             if os.path.exists(cfg_path):
                 cfg.read(cfg_path, encoding="utf-8")
                 return cfg.getboolean("automation", key, fallback=default)
+        except Exception:
+            pass
+        return default
+
+    def _load_str_automation(self, key, default=""):
+        try:
+            import configparser
+            cfg = configparser.ConfigParser()
+            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.properties")
+            if os.path.exists(cfg_path):
+                cfg.read(cfg_path, encoding="utf-8")
+                val = cfg.get("automation", key, fallback=default).strip().lower()
+                if val:
+                    return val
+        except Exception:
+            pass
+        return default
+
+    def _load_int_automation(self, key, default=20, min_val=5, max_val=50):
+        try:
+            import configparser
+            cfg = configparser.ConfigParser()
+            cfg_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.properties")
+            if os.path.exists(cfg_path):
+                cfg.read(cfg_path, encoding="utf-8")
+                v = cfg.getint("automation", key, fallback=default)
+                return max(min_val, min(max_val, v))
         except Exception:
             pass
         return default
@@ -265,15 +294,14 @@ class MediaWatcher(threading.Thread):
             if not containers_active:
                 continue
 
-            # Periodic ImportListSync & optional watched-media cleanup
+            # Periodic ImportListSync & watched-media watchlist/disk hygiene
             now_ts = time.time()
             if now_ts - self.last_import_list_sync >= self.import_list_sync_interval:
                 self.last_import_list_sync = now_ts
                 threading.Thread(target=sync_trakt_and_import_lists, daemon=True).start()
-                if self.watched_media_action in ("delete_after_rating", "delete_after_24h", "delete_immediate"):
-                    threading.Thread(target=cleanup_watched_media, args=(self.watched_media_action,), daemon=True).start()
+                threading.Thread(target=cleanup_watched_media, args=(self.watched_media_action,), daemon=True).start()
 
-            # Periodic Plexamp music rating sync (Aurral + ListenBrainz) & <2★ disliked cleanup (every 60s, local SSD only)
+            # Periodic Plexamp music rating sync (Aurral + ListenBrainz), <2★ disliked cleanup & scheduled discovery downloads
             if now_ts - self.last_music_cleanup >= 60:
                 self.last_music_cleanup = now_ts
                 if self.delete_disliked_music or self.sync_music_ratings:
@@ -284,6 +312,12 @@ class MediaWatcher(threading.Thread):
                             "sync_ratings": self.sync_music_ratings,
                             "music_dir": self.target_folders.get("music"),
                         },
+                        daemon=True,
+                    ).start()
+                if self.music_discovery_schedule and self.music_discovery_schedule != "off":
+                    threading.Thread(
+                        target=run_scheduled_music_discovery,
+                        kwargs={"force": False},
                         daemon=True,
                     ).start()
 
@@ -442,12 +476,15 @@ def trigger_plex_full_scan_on_startup():
 _trakt_sync_lock = threading.Lock()
 
 def _push_item_to_radarr_or_sonarr(kind, obj):
-    """Pushes a Trakt Watchlist movie/show directly to Radarr/Sonarr if online and not already present/excluded."""
+    """Pushes a Watchlist movie/show directly to Radarr/Sonarr if online and not already present or excluded."""
     import radarr_sonarr_sync
     ids = obj.get("ids") or {}
 
     if kind == "movie" and ids.get("tmdb"):
         tmdb_id = int(ids["tmdb"])
+        imdb_id = ids.get("imdb") or ""
+        if radarr_sonarr_sync.is_media_excluded("movie", tmdb_id=tmdb_id, imdb_id=imdb_id):
+            return
         api_key = radarr_sonarr_sync._get_api_key(os.path.join(radarr_sonarr_sync.RADARR_DIR, "config.xml"))
         if not api_key or not radarr_sonarr_sync._is_service_online("http://127.0.0.1:7878", api_key):
             return
@@ -456,7 +493,7 @@ def _push_item_to_radarr_or_sonarr(kind, obj):
             if existing:
                 return
             exclusions = radarr_sonarr_sync._api_request("http://127.0.0.1:7878", api_key, "/api/v3/exclusions") or []
-            if any(e.get("tmdbId") == tmdb_id for e in exclusions):
+            if any(int(e.get("tmdbId") or 0) == tmdb_id for e in exclusions):
                 return
             lists = radarr_sonarr_sync._api_request("http://127.0.0.1:7878", api_key, "/api/v3/importlist") or []
             q_id = lists[0].get("qualityProfileId") if lists else None
@@ -475,18 +512,25 @@ def _push_item_to_radarr_or_sonarr(kind, obj):
             lookup["monitored"] = True
             lookup["addOptions"] = {"monitor": "movieOnly", "searchForMovie": True}
             radarr_sonarr_sync._api_request("http://127.0.0.1:7878", api_key, "/api/v3/movie", method="POST", payload=lookup, timeout=15)
+            radarr_sonarr_sync.reconcile_arr_deletions()
             print(f"🎬 [Trakt->Radarr] Added & searching: {obj.get('title')} ({obj.get('year')})")
         except Exception as e:
             print(f"⚠️ [Trakt->Radarr] Could not add {obj.get('title')}: {e}")
 
     elif kind == "show" and ids.get("tvdb"):
         tvdb_id = int(ids["tvdb"])
+        imdb_id = ids.get("imdb") or ""
+        if radarr_sonarr_sync.is_media_excluded("show", tvdb_id=tvdb_id, imdb_id=imdb_id):
+            return
         api_key = radarr_sonarr_sync._get_api_key(os.path.join(radarr_sonarr_sync.SONARR_DIR, "config.xml"))
         if not api_key or not radarr_sonarr_sync._is_service_online("http://127.0.0.1:8989", api_key):
             return
         try:
             existing = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", api_key, f"/api/v3/series?tvdbId={tvdb_id}")
             if existing:
+                return
+            exclusions = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", api_key, "/api/v3/importlistexclusion") or []
+            if any(int(e.get("tvdbId") or 0) == tvdb_id for e in exclusions):
                 return
             lists = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", api_key, "/api/v3/importlist") or []
             q_id = lists[0].get("qualityProfileId") if lists else None
@@ -506,101 +550,265 @@ def _push_item_to_radarr_or_sonarr(kind, obj):
             lookup["monitored"] = True
             lookup["addOptions"] = {"searchForMissingEpisodes": True}
             radarr_sonarr_sync._api_request("http://127.0.0.1:8989", api_key, "/api/v3/series", method="POST", payload=lookup, timeout=15)
+            radarr_sonarr_sync.reconcile_arr_deletions()
             print(f"📺 [Trakt->Sonarr] Added & searching: {obj.get('title')} ({obj.get('year')})")
         except Exception as e:
             print(f"⚠️ [Trakt->Sonarr] Could not add {obj.get('title')}: {e}")
 
+
+def _make_watchlist_key(kind, tmdb=None, tvdb=None, imdb=None, plex_guid=None):
+    if kind == "movie":
+        if tmdb:
+            return f"movie:tmdb:{int(tmdb)}"
+        if imdb:
+            return f"movie:imdb:{str(imdb)}"
+    else:
+        if tvdb:
+            return f"show:tvdb:{int(tvdb)}"
+        if tmdb:
+            return f"show:tmdb:{int(tmdb)}"
+        if imdb:
+            return f"show:imdb:{str(imdb)}"
+    if plex_guid:
+        return f"{kind}:plex:{plex_guid}"
+    return None
+
+
 def sync_trakt_watchlist():
-    """Directly syncs Trakt Watchlist -> Plex Watchlist AND pushes new items straight to Radarr/Sonarr.
-    Fast (~0.5s), works even when Plex container is stopped, and bypasses Radarr/Sonarr 6h/12h refresh limits."""
+    """Two-way exclusion-aware Watchlist sync between Trakt Watchlist, Plex Watchlist, Radarr, and Sonarr.
+    - Detects Radarr/Sonarr UI deletions first so deleted items never get re-added.
+    - Propagates Watchlist removals across both Plex & Trakt instead of resurrecting removed items.
+    - Blocks excluded items unless freshly re-added to Trakt Watchlist after exclusion timestamp."""
     import json
+    import radarr_sonarr_sync
+
     project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     pytrakt_path = os.path.join(project_root, "services", "tools", "plextraktsync", "config", ".pytrakt.json")
     plex_token = _get_plex_token()
-    if not (os.path.exists(pytrakt_path) and plex_token):
+    if not plex_token:
         return False
     if not _trakt_sync_lock.acquire(blocking=False):
         return False
     try:
-        with open(pytrakt_path, "r", encoding="utf-8") as f:
-            trakt_cfg = json.load(f)
-        client_id = trakt_cfg.get("CLIENT_ID")
-        oauth_token = trakt_cfg.get("OAUTH_TOKEN")
-        if not (client_id and oauth_token):
-            return False
+        # Step 0: Catch any movie/series deleted in Radarr/Sonarr UI BEFORE touching Watchlists
+        radarr_sonarr_sync.reconcile_arr_deletions()
 
-        # 1. Fetch fresh Trakt Watchlist (no local HTTP cache, no username-slug bug)
-        trakt_req = urllib.request.Request(
-            "https://api.trakt.tv/sync/watchlist",
-            headers={
-                "Content-Type": "application/json",
-                "trakt-api-version": "2",
-                "trakt-api-key": client_id,
-                "Authorization": f"Bearer {oauth_token}",
-                "User-Agent": "PodMedia/1.0",
-            },
-        )
-        with urllib.request.urlopen(trakt_req, timeout=10) as resp:
-            trakt_wl = json.loads(resp.read().decode("utf-8"))
+        trakt_configured = False
+        trakt_wl = []
+        if os.path.exists(pytrakt_path):
+            with open(pytrakt_path, "r", encoding="utf-8") as f:
+                trakt_cfg = json.load(f)
+            client_id = trakt_cfg.get("CLIENT_ID")
+            oauth_token = trakt_cfg.get("OAUTH_TOKEN")
+            if client_id and oauth_token:
+                trakt_req = urllib.request.Request(
+                    "https://api.trakt.tv/sync/watchlist",
+                    headers={
+                        "Content-Type": "application/json",
+                        "trakt-api-version": "2",
+                        "trakt-api-key": client_id,
+                        "Authorization": f"Bearer {oauth_token}",
+                        "User-Agent": "PodMedia/1.0",
+                    },
+                )
+                with urllib.request.urlopen(trakt_req, timeout=10) as resp:
+                    trakt_wl = json.loads(resp.read().decode("utf-8")) or []
+                trakt_configured = True
 
-        # 2. Fetch full Plex Watchlist ratingKeys/guids using pagination headers
-        plex_guids = set()
-        start = 0
-        page_size = 50
-        while start < 500:
-            plex_req = urllib.request.Request(
-                "https://discover.provider.plex.tv/library/sections/watchlist/all",
-                headers={
-                    "X-Plex-Token": plex_token,
-                    "Accept": "application/json",
-                    "X-Plex-Client-Identifier": "podmedia-sync",
-                    "X-Plex-Container-Start": str(start),
-                    "X-Plex-Container-Size": str(page_size),
-                    "User-Agent": "PodMedia/1.0",
-                },
-            )
-            with urllib.request.urlopen(plex_req, timeout=10) as resp:
-                plex_data = json.loads(resp.read().decode("utf-8"))
-            mc = plex_data.get("MediaContainer", {})
-            plex_meta = mc.get("Metadata", []) or []
-            for m in plex_meta:
-                if m.get("ratingKey"):
-                    plex_guids.add(str(m["ratingKey"]))
-                if m.get("guid"):
-                    plex_guids.add(str(m["guid"]).rsplit("/", 1)[-1])
-            total_size = int(mc.get("totalSize", len(plex_meta)))
-            start += len(plex_meta)
-            if not plex_meta or start >= total_size:
-                break
+        # Step 1: Fetch full Plex Watchlist with cached external GUIDs (tmdb, tvdb, imdb)
+        plex_items = radarr_sonarr_sync.resolve_plex_watchlist_items(plex_token)
 
-        # 3. Add any missing Trakt Watchlist item directly to Plex Watchlist & Radarr/Sonarr
+        # Build keyed maps & purge any already-excluded items lingering on either Watchlist
+        plex_map = {}
+        plex_rks = set()
+        for p in plex_items:
+            rk = p.get("ratingKey")
+            if rk:
+                plex_rks.add(str(rk))
+            kind = p.get("kind", "movie")
+            tmdb = p.get("tmdb")
+            tvdb = p.get("tvdb")
+            imdb = p.get("imdb")
+
+            excl = radarr_sonarr_sync.is_media_excluded(kind, tmdb_id=tmdb, tvdb_id=tvdb, imdb_id=imdb)
+            if excl:
+                # Stale/cached excluded item on Plex Watchlist -> purge it unless freshly re-added on Trakt below
+                radarr_sonarr_sync.remove_from_watchlists(
+                    kind, tmdb_id=tmdb, tvdb_id=tvdb, imdb_id=imdb, plex_guid=rk, title=p.get("title", ""), year=p.get("year")
+                )
+                plex_rks.discard(str(rk))
+                continue
+
+            wkey = _make_watchlist_key(kind, tmdb=tmdb, tvdb=tvdb, imdb=imdb, plex_guid=rk)
+            if wkey:
+                plex_map[wkey] = p
+
+        trakt_map = {}
         for item in trakt_wl:
-            kind = item.get("type")
-            obj = item.get(kind) or {}
-            pg = (obj.get("ids") or {}).get("plex", {}).get("guid") if isinstance((obj.get("ids") or {}).get("plex"), dict) else None
-            if pg and pg not in plex_guids:
+            raw_kind = item.get("type")
+            if raw_kind not in ("movie", "show"):
+                continue
+            obj = item.get(raw_kind) or {}
+            ids = obj.get("ids") or {}
+            tmdb = int(ids["tmdb"]) if ids.get("tmdb") else None
+            tvdb = int(ids["tvdb"]) if ids.get("tvdb") else None
+            imdb = str(ids["imdb"]) if ids.get("imdb") else None
+            pg = (ids.get("plex") or {}).get("guid") if isinstance(ids.get("plex"), dict) else None
+            listed_ts = _parse_iso_ts(item.get("listed_at"))
+
+            excl = radarr_sonarr_sync.is_media_excluded(raw_kind, tmdb_id=tmdb, tvdb_id=tvdb, imdb_id=imdb)
+            if excl:
+                excl_ts = int(excl.get("ts") or 0)
+                if listed_ts > 0 and listed_ts > (excl_ts + 120):
+                    # User intentionally re-added this title to Trakt Watchlist AFTER deleting/excluding it!
+                    radarr_sonarr_sync.unexclude_media(raw_kind, tmdb if raw_kind == "movie" else tvdb)
+                    print(f"♻️ [Watchlist] Lifted exclusion for freshly re-watchlisted {raw_kind}: {obj.get('title')}")
+                else:
+                    radarr_sonarr_sync.remove_from_watchlists(
+                        raw_kind, tmdb_id=tmdb, tvdb_id=tvdb, imdb_id=imdb, plex_guid=pg, title=obj.get("title", ""), year=obj.get("year")
+                    )
+                    continue
+
+            wkey = _make_watchlist_key(raw_kind, tmdb=tmdb, tvdb=tvdb, imdb=imdb, plex_guid=pg)
+            if wkey:
+                trakt_map[wkey] = {
+                    "kind": raw_kind,
+                    "obj": obj,
+                    "tmdb": tmdb,
+                    "tvdb": tvdb,
+                    "imdb": imdb,
+                    "plex_guid": pg,
+                    "title": obj.get("title", ""),
+                    "year": obj.get("year"),
+                    "listed_ts": listed_ts,
+                }
+
+        # Step 2: Two-way removal propagation using previous synced_watchlist snapshot
+        state = radarr_sonarr_sync.load_media_sync_state()
+        prev_wl = state.get("synced_watchlist") or {}
+
+        for wkey, prev_entry in list(prev_wl.items()):
+            was_trakt = bool(prev_entry.get("in_trakt"))
+            was_plex = bool(prev_entry.get("in_plex"))
+            now_trakt = wkey in trakt_map
+            now_plex = wkey in plex_map
+            p_kind = prev_entry.get("kind", "movie")
+
+            if trakt_configured and was_trakt and not now_trakt:
+                # User (or Trakt scrobble) removed item from Trakt Watchlist -> remove from Plex Watchlist too!
+                if now_plex:
+                    p_item = plex_map.pop(wkey, {})
+                    radarr_sonarr_sync.remove_from_watchlists(
+                        p_kind,
+                        tmdb_id=prev_entry.get("tmdb") or p_item.get("tmdb"),
+                        tvdb_id=prev_entry.get("tvdb") or p_item.get("tvdb"),
+                        imdb_id=prev_entry.get("imdb") or p_item.get("imdb"),
+                        plex_guid=p_item.get("ratingKey") or prev_entry.get("plex_guid"),
+                        title=prev_entry.get("title", ""),
+                        year=prev_entry.get("year"),
+                    )
+                    if p_item.get("ratingKey"):
+                        plex_rks.discard(str(p_item["ratingKey"]))
+                    print(f"🧹 [Trakt->Plex] Propagated Trakt Watchlist removal to Plex: {prev_entry.get('title')}")
+            elif was_plex and not now_plex:
+                # User removed item from Plex Watchlist -> remove from Trakt Watchlist instead of resurrecting!
+                if trakt_configured and now_trakt:
+                    t_item = trakt_map.pop(wkey, {})
+                    radarr_sonarr_sync.remove_from_watchlists(
+                        p_kind,
+                        tmdb_id=prev_entry.get("tmdb") or t_item.get("tmdb"),
+                        tvdb_id=prev_entry.get("tvdb") or t_item.get("tvdb"),
+                        imdb_id=prev_entry.get("imdb") or t_item.get("imdb"),
+                        plex_guid=prev_entry.get("plex_guid") or t_item.get("plex_guid"),
+                        title=prev_entry.get("title", ""),
+                        year=prev_entry.get("year"),
+                    )
+                    print(f"🧹 [Plex->Trakt] Propagated Plex Watchlist removal to Trakt: {prev_entry.get('title')}")
+
+        # Step 3: Push active Trakt Watchlist items to Plex Watchlist & Radarr/Sonarr
+        for wkey, t_entry in trakt_map.items():
+            pg = t_entry.get("plex_guid")
+            if pg and pg not in plex_rks and wkey not in plex_map:
                 put_req = urllib.request.Request(
                     f"https://discover.provider.plex.tv/actions/addToWatchlist?ratingKey={pg}",
-                    headers={"X-Plex-Token": plex_token, "X-Plex-Client-Identifier": "podmedia-sync", "User-Agent": "PodMedia/1.0"},
+                    headers={
+                        "X-Plex-Token": plex_token,
+                        "X-Plex-Client-Identifier": "podmedia-sync",
+                        "User-Agent": "PodMedia/1.0",
+                    },
                     method="PUT",
                 )
                 try:
                     with urllib.request.urlopen(put_req, timeout=10) as pr:
                         if pr.status in (200, 204):
-                            plex_guids.add(pg)
-                            print(f"🔄 [Trakt->Plex] Added to Plex Watchlist: {obj.get('title')} ({obj.get('year')})")
+                            plex_rks.add(pg)
+                            plex_map[wkey] = {
+                                "ratingKey": pg,
+                                "kind": t_entry["kind"],
+                                "tmdb": t_entry["tmdb"],
+                                "tvdb": t_entry["tvdb"],
+                                "imdb": t_entry["imdb"],
+                                "title": t_entry["title"],
+                                "year": t_entry["year"],
+                            }
+                            print(f"🔄 [Trakt->Plex] Added to Plex Watchlist: {t_entry.get('title')} ({t_entry.get('year')})")
                 except Exception as e:
-                    print(f"⚠️ [Trakt->Plex] Failed to add {obj.get('title')}: {e}")
-            _push_item_to_radarr_or_sonarr(kind, obj)
+                    print(f"⚠️ [Trakt->Plex] Failed to add {t_entry.get('title')}: {e}")
+
+            _push_item_to_radarr_or_sonarr(t_entry["kind"], t_entry["obj"])
+
+        # Also push any Plex-only Watchlist items straight to Radarr/Sonarr (unless excluded)
+        for wkey, p_entry in plex_map.items():
+            if wkey in trakt_map:
+                continue
+            ids_dict = {}
+            if p_entry.get("tmdb"):
+                ids_dict["tmdb"] = p_entry["tmdb"]
+            if p_entry.get("tvdb"):
+                ids_dict["tvdb"] = p_entry["tvdb"]
+            if p_entry.get("imdb"):
+                ids_dict["imdb"] = p_entry["imdb"]
+            if ids_dict:
+                _push_item_to_radarr_or_sonarr(
+                    p_entry.get("kind", "movie"),
+                    {"title": p_entry.get("title", ""), "year": p_entry.get("year"), "ids": ids_dict},
+                )
+
+        # Step 4: Persist unified Watchlist snapshot
+        new_wl = {}
+        all_keys = set(trakt_map.keys()) | set(plex_map.keys())
+        for wkey in all_keys:
+            te = trakt_map.get(wkey) or {}
+            pe = plex_map.get(wkey) or {}
+            new_wl[wkey] = {
+                "kind": te.get("kind") or pe.get("kind") or "movie",
+                "tmdb": te.get("tmdb") or pe.get("tmdb"),
+                "tvdb": te.get("tvdb") or pe.get("tvdb"),
+                "imdb": te.get("imdb") or pe.get("imdb"),
+                "plex_guid": pe.get("ratingKey") or te.get("plex_guid"),
+                "title": te.get("title") or pe.get("title") or "",
+                "year": te.get("year") or pe.get("year"),
+                "in_trakt": wkey in trakt_map,
+                "in_plex": wkey in plex_map,
+            }
+        state = radarr_sonarr_sync.load_media_sync_state()
+        state["synced_watchlist"] = new_wl
+        radarr_sonarr_sync.save_media_sync_state(state)
         return True
     except Exception as e:
-        print(f"⚠️ [Trakt->Plex] Watchlist sync skipped: {e}")
+        print(f"⚠️ [WatchlistSync] Watchlist sync skipped: {e}")
     finally:
         _trakt_sync_lock.release()
     return False
 
+
 def sync_trakt_and_import_lists(target='both'):
-    """Syncs Trakt -> Plex Watchlist & Radarr/Sonarr (if configured), then triggers ImportListSync."""
+    """Reconciles Radarr/Sonarr deletions, syncs Trakt <-> Plex Watchlists, then triggers ImportListSync."""
+    try:
+        import radarr_sonarr_sync
+        radarr_sonarr_sync.reconcile_arr_deletions()
+    except Exception:
+        pass
     sync_trakt_watchlist()
     try:
         import radarr_sonarr_sync
@@ -611,8 +819,9 @@ def sync_trakt_and_import_lists(target='both'):
     except Exception:
         pass
 
+
 def trigger_import_list_sync_on_startup(target='both'):
-    """Waits asynchronously for Radarr/Sonarr API startup, then syncs Trakt Watchlist & ImportLists immediately."""
+    """Waits asynchronously for Radarr/Sonarr API startup, then reconciles deletions & syncs Watchlists."""
     def _worker():
         import radarr_sonarr_sync
         targets = []
@@ -631,6 +840,7 @@ def trigger_import_list_sync_on_startup(target='both'):
             for name, base_url, xml_path, trigger_fn in pending:
                 key = radarr_sonarr_sync._get_api_key(xml_path)
                 if key and radarr_sonarr_sync._is_service_online(base_url, key):
+                    radarr_sonarr_sync.reconcile_arr_deletions()
                     if not synced_trakt:
                         sync_trakt_watchlist()
                         synced_trakt = True
@@ -643,7 +853,9 @@ def trigger_import_list_sync_on_startup(target='both'):
     t = threading.Thread(target=_worker, daemon=True)
     t.start()
 
+
 _watched_cleanup_lock = threading.Lock()
+
 
 def _parse_iso_ts(iso_str):
     if not iso_str:
@@ -654,15 +866,17 @@ def _parse_iso_ts(iso_str):
     except Exception:
         return 0
 
+
 def cleanup_watched_media(mode="keep"):
-    """Safely removes watched movies from Watchlists (Plex & Trakt) and disk via Radarr.
-    - 'delete_after_rating': detects ratings from EITHER Plex or Trakt (even if watched/rated
-      solely on Trakt after adding to library), ensures both watched state and rating are
-      synced to Plex & Trakt first, then deletes safely.
+    """Manages watched/rated movies (Radarr) and TV shows (Sonarr) across Plex & Trakt:
+    - 'keep': keeps media files on disk, but removes watched items from Plex & Trakt Watchlists
+      and adds Import Exclusions so if manually deleted later they NEVER re-download.
+    - 'delete_after_rating': after watching/rating on Plex or Trakt (two-way synced first),
+      removes from Watchlists, adds Import Exclusion, unmonitors, and deletes media file(s).
     - 'delete_after_24h': deletes 24 hours after watching (Plex or Trakt).
     - 'delete_immediate': deletes ~10 minutes after watching (Plex or Trakt).
-    Always skips anything currently being streamed in Plex to prevent file handle locks."""
-    if mode not in ("delete_after_rating", "delete_after_24h", "delete_immediate"):
+    Always skips anything currently being streamed in Plex and skips when Plex runs in music-only stub mode."""
+    if mode not in ("keep", "delete_after_rating", "delete_after_24h", "delete_immediate"):
         return
     if not _watched_cleanup_lock.acquire(blocking=False):
         return
@@ -670,52 +884,39 @@ def cleanup_watched_media(mode="keep"):
         import json
         from datetime import datetime, timezone
         import radarr_sonarr_sync
+        import podman_manager
+
+        plex_stub_mode = (podman_manager.get_plex_disk_mode() == "stub")
         plex_token = _get_plex_token()
         if not plex_token:
             return
         headers = {"X-Plex-Token": plex_token, "Accept": "application/json"}
-        min_age = 86400 if mode == "delete_after_24h" else (60 if mode == "delete_after_rating" else 600)
+        min_age = 86400 if mode == "delete_after_24h" else (60 if mode in ("keep", "delete_after_rating") else 600)
+        delete_files = mode in ("delete_after_rating", "delete_after_24h", "delete_immediate")
         now_ts = time.time()
 
-        # 1. Check active Plex streaming sessions so we NEVER touch a file currently being played
+        # 1. Check active Plex streaming sessions so we NEVER touch a file or series currently being played
         active_keys = set()
         try:
             sreq = urllib.request.Request("http://127.0.0.1:32400/status/sessions", headers=headers)
             with urllib.request.urlopen(sreq, timeout=4) as sresp:
                 sdata = json.loads(sresp.read().decode("utf-8"))
                 for m in sdata.get("MediaContainer", {}).get("Metadata", []) or []:
-                    if m.get("ratingKey"):
-                        active_keys.add(str(m["ratingKey"]))
+                    for kname in ("ratingKey", "parentRatingKey", "grandparentRatingKey"):
+                        if m.get(kname):
+                            active_keys.add(str(m[kname]))
         except Exception:
             return  # Plex offline -> skip safely
 
         # Load Trakt credentials if available
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        pytrakt_path = os.path.join(project_root, "services", "tools", "plextraktsync", "config", ".pytrakt.json")
-        trakt_creds = None
-        if os.path.exists(pytrakt_path):
-            try:
-                with open(pytrakt_path, "r", encoding="utf-8") as f:
-                    trakt_creds = json.load(f)
-            except Exception:
-                pass
+        trakt_headers = radarr_sonarr_sync._get_trakt_headers()
 
-        trakt_headers = None
-        if trakt_creds and trakt_creds.get("CLIENT_ID") and trakt_creds.get("OAUTH_TOKEN"):
-            trakt_headers = {
-                "Content-Type": "application/json",
-                "trakt-api-version": "2",
-                "trakt-api-key": trakt_creds["CLIENT_ID"],
-                "Authorization": f"Bearer {trakt_creds['OAUTH_TOKEN']}",
-                "User-Agent": "PodMedia/1.0",
-            }
-
-        # Fetch Trakt watched movies & movie ratings once so we can detect Trakt-originated watches/ratings
-        # and guarantee two-way sync before deleting anything.
-        trakt_watched_tmdb = {}   # tmdb_id -> last_watched_ts
-        trakt_watched_imdb = {}   # imdb_id -> last_watched_ts
-        trakt_ratings_tmdb = {}   # tmdb_id -> (rating_int, rated_at_ts)
-        trakt_ratings_imdb = {}   # imdb_id -> (rating_int, rated_at_ts)
+        trakt_watched_tmdb = {}
+        trakt_watched_imdb = {}
+        trakt_ratings_tmdb = {}
+        trakt_ratings_imdb = {}
+        trakt_show_ratings_tvdb = {}
+        trakt_show_ratings_imdb = {}
         if trakt_headers:
             try:
                 tw_req = urllib.request.Request("https://api.trakt.tv/sync/watched/movies", headers=trakt_headers)
@@ -740,8 +941,22 @@ def cleanup_watched_media(mode="keep"):
                                 trakt_ratings_tmdb[int(m_ids["tmdb"])] = pair
                             if m_ids.get("imdb"):
                                 trakt_ratings_imdb[str(m_ids["imdb"])] = pair
+
+                trs_req = urllib.request.Request("https://api.trakt.tv/sync/ratings/shows", headers=trakt_headers)
+                with urllib.request.urlopen(trs_req, timeout=8) as trs_resp:
+                    for entry in json.loads(trs_resp.read().decode("utf-8")) or []:
+                        r_score = entry.get("rating")
+                        r_ts = _parse_iso_ts(entry.get("rated_at"))
+                        s_ids = (entry.get("show") or {}).get("ids") or {}
+                        if r_score:
+                            pair = (int(r_score), r_ts)
+                            if s_ids.get("tvdb"):
+                                trakt_show_ratings_tvdb[int(s_ids["tvdb"])] = pair
+                            if s_ids.get("imdb"):
+                                trakt_show_ratings_imdb[str(s_ids["imdb"])] = pair
             except Exception:
-                return  # Trakt is configured but unreachable right now -> wait safely instead of risking unsynced data
+                if delete_files:
+                    return  # Trakt configured but unreachable -> skip file deletion safely
 
         # 2. Fetch Plex library sections
         sec_req = urllib.request.Request("http://127.0.0.1:32400/library/sections", headers=headers)
@@ -757,194 +972,333 @@ def cleanup_watched_media(mode="keep"):
             except Exception:
                 radarr_movies = []
 
-        cleaned_any_movie = False
+        sonarr_key = radarr_sonarr_sync._get_api_key(os.path.join(radarr_sonarr_sync.SONARR_DIR, "config.xml"))
+        sonarr_online = bool(sonarr_key and radarr_sonarr_sync._is_service_online("http://127.0.0.1:8989", sonarr_key))
+        sonarr_series = None
+        if sonarr_online:
+            try:
+                sonarr_series = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", sonarr_key, "/api/v3/series", timeout=5) or []
+            except Exception:
+                sonarr_series = []
+
         for sec in sections:
-            if sec.get("type") != "movie":
-                continue
+            sec_type = sec.get("type")
             sec_key = sec.get("key")
-            m_req = urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/all?includeGuids=1", headers=headers)
-            with urllib.request.urlopen(m_req, timeout=8) as mresp:
-                items = json.loads(mresp.read().decode("utf-8")).get("MediaContainer", {}).get("Metadata", []) or []
 
-            for item in items:
-                rk = str(item.get("ratingKey", ""))
-                if not rk or rk in active_keys:
-                    continue
+            # =========================================================
+            # MOVIES (Radarr + Plex + Trakt)
+            # =========================================================
+            if sec_type == "movie":
+                cleaned_any_movie = False
+                m_req = urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/all?includeGuids=1", headers=headers)
+                with urllib.request.urlopen(m_req, timeout=8) as mresp:
+                    items = json.loads(mresp.read().decode("utf-8")).get("MediaContainer", {}).get("Metadata", []) or []
 
-                added_at = int(item.get("addedAt") or 0)
-                view_count = int(item.get("viewCount") or 0)
-                last_viewed = int(item.get("lastViewedAt") or 0)
-                last_rated = int(item.get("lastRatedAt") or 0)
-                plex_rating = item.get("userRating")
+                for item in items:
+                    rk = str(item.get("ratingKey", ""))
+                    if not rk or rk in active_keys:
+                        continue
 
-                tmdb_id = None
-                imdb_id = None
-                plex_guid = str(item.get("guid") or "").rsplit("/", 1)[-1]
-                for g in item.get("Guid") or []:
-                    gid = g.get("id", "")
-                    if gid.startswith("tmdb://"):
-                        try:
-                            tmdb_id = int(gid.replace("tmdb://", ""))
-                        except Exception:
-                            pass
-                    elif gid.startswith("imdb://"):
-                        imdb_id = gid.replace("imdb://", "")
+                    added_at = int(item.get("addedAt") or 0)
+                    view_count = int(item.get("viewCount") or 0)
+                    last_viewed = int(item.get("lastViewedAt") or 0)
+                    last_rated = int(item.get("lastRatedAt") or 0)
+                    plex_rating = item.get("userRating")
 
-                trakt_watched_ts = trakt_watched_tmdb.get(tmdb_id) or trakt_watched_imdb.get(imdb_id) or 0
-                trakt_rating_pair = trakt_ratings_tmdb.get(tmdb_id) or trakt_ratings_imdb.get(imdb_id)
-                trakt_rating = trakt_rating_pair[0] if trakt_rating_pair else None
-                trakt_rated_ts = trakt_rating_pair[1] if trakt_rating_pair else 0
+                    tmdb_id = None
+                    imdb_id = None
+                    plex_guid = str(item.get("guid") or "").rsplit("/", 1)[-1]
+                    for g in item.get("Guid") or []:
+                        gid = g.get("id", "")
+                        if gid.startswith("tmdb://"):
+                            try:
+                                tmdb_id = int(gid.replace("tmdb://", ""))
+                            except Exception:
+                                pass
+                        elif gid.startswith("imdb://"):
+                            imdb_id = gid.replace("imdb://", "")
 
-                plex_watched = view_count > 0
-                trakt_watched = trakt_watched_ts > 0
+                    # In 'keep' mode, if already excluded as watched, skip in O(1) without extra API calls
+                    if not delete_files and tmdb_id and radarr_sonarr_sync.is_media_excluded("movie", tmdb_id=tmdb_id, imdb_id=imdb_id):
+                        continue
 
-                # Determine whether this library copy qualifies as watched/rated (from Plex OR Trakt),
-                # while protecting re-downloaded old favorites whose Trakt activity predates addedAt.
-                plex_eligible = plex_watched and (now_ts - max(last_viewed, last_rated)) >= min_age
-                trakt_watched_eligible = (
-                    trakt_watched
-                    and trakt_watched_ts >= (added_at - 86400)
-                    and (now_ts - trakt_watched_ts) >= min_age
-                )
-                trakt_rated_eligible = (
-                    mode == "delete_after_rating"
-                    and bool(trakt_rating)
-                    and trakt_rated_ts >= (added_at - 86400)
-                    and (now_ts - trakt_rated_ts) >= min_age
-                )
+                    trakt_watched_ts = trakt_watched_tmdb.get(tmdb_id) or trakt_watched_imdb.get(imdb_id) or 0
+                    trakt_rating_pair = trakt_ratings_tmdb.get(tmdb_id) or trakt_ratings_imdb.get(imdb_id)
+                    trakt_rating = trakt_rating_pair[0] if trakt_rating_pair else None
+                    trakt_rated_ts = trakt_rating_pair[1] if trakt_rating_pair else 0
 
-                if not (plex_eligible or trakt_watched_eligible or trakt_rated_eligible):
-                    continue
+                    plex_watched = view_count > 0
+                    trakt_watched = trakt_watched_ts > 0
 
-                if trakt_headers and not (tmdb_id or imdb_id):
-                    continue  # Unmatched item while Trakt is active — keep safely
+                    plex_eligible = plex_watched and (now_ts - max(last_viewed, last_rated)) >= min_age
+                    trakt_watched_eligible = (
+                        trakt_watched
+                        and trakt_watched_ts >= (added_at - 86400)
+                        and (now_ts - trakt_watched_ts) >= min_age
+                    )
+                    trakt_rated_eligible = (
+                        mode == "delete_after_rating"
+                        and bool(trakt_rating)
+                        and trakt_rated_ts >= (added_at - 86400)
+                        and (now_ts - trakt_rated_ts) >= min_age
+                    )
 
-                ids_obj = {}
-                if tmdb_id:
-                    ids_obj["tmdb"] = tmdb_id
-                if imdb_id:
-                    ids_obj["imdb"] = imdb_id
+                    if not (plex_eligible or trakt_watched_eligible or trakt_rated_eligible):
+                        continue
 
-                # Rating gate for 'delete_after_rating' mode
-                if mode == "delete_after_rating":
-                    if not plex_rating and not trakt_rating:
-                        continue  # Not rated in Plex or Trakt yet — keep file safely
+                    if delete_files and trakt_headers and not (tmdb_id or imdb_id):
+                        continue
 
-                # Two-way sync BEFORE deletion:
-                # 1) Ensure Plex watched status & rating reach Trakt
-                if trakt_headers and ids_obj:
-                    if plex_watched and not trakt_watched:
-                        try:
-                            w_iso = datetime.fromtimestamp(last_viewed or now_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-                            tr_hist = urllib.request.Request(
-                                "https://api.trakt.tv/sync/history",
-                                data=json.dumps({"movies": [{"watched_at": w_iso, "ids": ids_obj}]}).encode("utf-8"),
-                                headers=trakt_headers,
-                                method="POST",
-                            )
-                            with urllib.request.urlopen(tr_hist, timeout=8) as h_resp:
-                                if h_resp.status not in (200, 201):
+                    ids_obj = {}
+                    if tmdb_id:
+                        ids_obj["tmdb"] = tmdb_id
+                    if imdb_id:
+                        ids_obj["imdb"] = imdb_id
+
+                    if mode == "delete_after_rating" and not plex_rating and not trakt_rating:
+                        continue
+
+                    # Two-way sync BEFORE Watchlist removal / file deletion
+                    if trakt_headers and ids_obj:
+                        if plex_watched and not trakt_watched:
+                            try:
+                                w_iso = datetime.fromtimestamp(last_viewed or now_ts, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+                                tr_hist = urllib.request.Request(
+                                    "https://api.trakt.tv/sync/history",
+                                    data=json.dumps({"movies": [{"watched_at": w_iso, "ids": ids_obj}]}).encode("utf-8"),
+                                    headers=trakt_headers,
+                                    method="POST",
+                                )
+                                with urllib.request.urlopen(tr_hist, timeout=8) as h_resp:
+                                    if h_resp.status not in (200, 201) and delete_files:
+                                        continue
+                            except Exception:
+                                if delete_files:
                                     continue
+
+                        if plex_rating and not trakt_rating:
+                            try:
+                                score_int = max(1, min(10, int(round(float(plex_rating)))))
+                                tr_rate = urllib.request.Request(
+                                    "https://api.trakt.tv/sync/ratings",
+                                    data=json.dumps({"movies": [{"rating": score_int, "ids": ids_obj}]}).encode("utf-8"),
+                                    headers=trakt_headers,
+                                    method="POST",
+                                )
+                                with urllib.request.urlopen(tr_rate, timeout=8) as r_resp:
+                                    if r_resp.status not in (200, 201) and delete_files:
+                                        continue
+                            except Exception:
+                                if delete_files:
+                                    continue
+
+                    synced_to_plex_now = False
+                    if (trakt_watched or trakt_rating) and not plex_watched:
+                        try:
+                            sc_req = urllib.request.Request(
+                                f"http://127.0.0.1:32400/:/scrobble?identifier=com.plexapp.plugins.library&key={rk}",
+                                headers=headers,
+                                method="GET",
+                            )
+                            urllib.request.urlopen(sc_req, timeout=5).close()
+                            synced_to_plex_now = True
                         except Exception:
+                            if delete_files:
+                                continue
+
+                    if trakt_rating and not plex_rating:
+                        try:
+                            pr_req = urllib.request.Request(
+                                f"http://127.0.0.1:32400/:/rate?identifier=com.plexapp.plugins.library&key={rk}&rating={trakt_rating}",
+                                headers=headers,
+                                method="PUT",
+                            )
+                            urllib.request.urlopen(pr_req, timeout=5).close()
+                            synced_to_plex_now = True
+                        except Exception:
+                            if delete_files:
+                                continue
+
+                    if delete_files and synced_to_plex_now:
+                        continue  # Wait 1 cycle before deleting file so Plex persists watched+rating
+
+                    # Always remove watched movie from BOTH Watchlists & add Radarr Import Exclusion
+                    if tmdb_id:
+                        radarr_sonarr_sync.exclude_and_purge_media(
+                            "movie",
+                            tmdb_id=tmdb_id,
+                            imdb_id=imdb_id,
+                            plex_guid=plex_guid,
+                            title=item.get("title", ""),
+                            year=item.get("year", 0),
+                            reason=f"watched_{mode}",
+                            cancel_queue=delete_files,
+                        )
+                    else:
+                        radarr_sonarr_sync.remove_from_watchlists(
+                            "movie", imdb_id=imdb_id, plex_guid=plex_guid, title=item.get("title", ""), year=item.get("year")
+                        )
+
+                    if not delete_files:
+                        continue  # 'keep' mode: file stays safely on disk, Watchlist + Exclusion are now clean!
+
+                    # Delete file & unmonitor via Radarr (skip external-disk files if Plex/Radarr is in stub mode)
+                    if radarr_online and radarr_movies is not None and tmdb_id:
+                        for rm in radarr_movies:
+                            if rm.get("tmdbId") == tmdb_id:
+                                rm_path = str(rm.get("path") or "")
+                                if plex_stub_mode and rm_path.startswith("/movies_external/"):
+                                    break
+                                mf_id = (rm.get("movieFile") or {}).get("id") or rm.get("movieFileId")
+                                if rm.get("monitored"):
+                                    rm["monitored"] = False
+                                    try:
+                                        radarr_sonarr_sync._api_request("http://127.0.0.1:7878", radarr_key, f"/api/v3/movie/{rm['id']}", method="PUT", payload=rm, timeout=6)
+                                    except Exception:
+                                        pass
+                                if mf_id:
+                                    try:
+                                        radarr_sonarr_sync._api_request("http://127.0.0.1:7878", radarr_key, f"/api/v3/moviefile/{mf_id}", method="DELETE", timeout=8)
+                                        cleaned_any_movie = True
+                                        print(f"🧹 [WatchedCleanup] Deleted watched movie file, unmonitored & excluded: {item.get('title')}")
+                                    except Exception as e:
+                                        print(f"⚠️ [WatchedCleanup] Could not delete {item.get('title')}: {e}")
+                                break
+
+                if cleaned_any_movie and not plex_stub_mode:
+                    try:
+                        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/refresh", headers=headers), timeout=4).close()
+                        schedule_plex_empty_trash("movies", delay=8)
+                    except Exception:
+                        pass
+
+            # =========================================================
+            # TV SHOWS (Sonarr + Plex + Trakt)
+            # =========================================================
+            elif sec_type in ("show", "series"):
+                cleaned_any_show = False
+                s_req = urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/all?includeGuids=1", headers=headers)
+                with urllib.request.urlopen(s_req, timeout=8) as sresp:
+                    shows = json.loads(sresp.read().decode("utf-8")).get("MediaContainer", {}).get("Metadata", []) or []
+
+                sonarr_by_tvdb = {int(s["tvdbId"]): s for s in (sonarr_series or []) if s.get("tvdbId")}
+
+                for show in shows:
+                    show_rk = str(show.get("ratingKey", ""))
+                    if not show_rk or show_rk in active_keys:
+                        continue
+
+                    tvdb_id = None
+                    imdb_id = None
+                    plex_guid = str(show.get("guid") or "").rsplit("/", 1)[-1]
+                    for g in show.get("Guid") or []:
+                        gid = g.get("id", "")
+                        if gid.startswith("tvdb://"):
+                            try:
+                                tvdb_id = int(gid.replace("tvdb://", ""))
+                            except Exception:
+                                pass
+                        elif gid.startswith("imdb://"):
+                            imdb_id = gid.replace("imdb://", "")
+
+                    leaf_count = int(show.get("leafCount") or 0)
+                    viewed_leaf_count = int(show.get("viewedLeafCount") or 0)
+                    all_present_watched = leaf_count > 0 and viewed_leaf_count >= leaf_count
+
+                    s_obj = sonarr_by_tvdb.get(tvdb_id) if tvdb_id else None
+                    series_ended = bool(s_obj and str(s_obj.get("status") or "").lower() == "ended")
+
+                    plex_show_rating = show.get("userRating")
+                    trakt_s_pair = trakt_show_ratings_tvdb.get(tvdb_id) or trakt_show_ratings_imdb.get(imdb_id)
+                    trakt_show_rating = trakt_s_pair[0] if trakt_s_pair else None
+
+                    # 1) Whole-show Watchlist & Exclusion hygiene when completed & ended (or rated in delete_after_rating)
+                    if all_present_watched and (series_ended or (mode == "delete_after_rating" and (plex_show_rating or trakt_show_rating))):
+                        if tvdb_id and not radarr_sonarr_sync.is_media_excluded("show", tvdb_id=tvdb_id, imdb_id=imdb_id):
+                            if series_ended:
+                                radarr_sonarr_sync.exclude_and_purge_media(
+                                    "show",
+                                    tvdb_id=tvdb_id,
+                                    imdb_id=imdb_id,
+                                    plex_guid=plex_guid,
+                                    title=show.get("title", ""),
+                                    year=show.get("year", 0),
+                                    reason=f"watched_{mode}",
+                                    cancel_queue=False,
+                                )
+
+                    if not delete_files or not sonarr_online or not s_obj:
+                        continue
+                    s_path_str = str(s_obj.get("path") or "")
+                    if plex_stub_mode and (s_path_str.startswith("/tv_external/") or s_path_str.startswith("/series_external/")):
+                        continue
+
+                    if mode == "delete_after_rating" and not (plex_show_rating or trakt_show_rating):
+                        continue
+
+                    # 2) Episode-level cleanup in Sonarr for watched episodes exceeding min_age
+                    if viewed_leaf_count <= 0:
+                        continue
+                    try:
+                        ep_req = urllib.request.Request(f"http://127.0.0.1:32400/library/metadata/{show_rk}/allLeaves", headers=headers)
+                        with urllib.request.urlopen(ep_req, timeout=8) as ep_resp:
+                            plex_eps = json.loads(ep_resp.read().decode("utf-8")).get("MediaContainer", {}).get("Metadata", []) or []
+
+                        eligible_se_ep = set()
+                        for pep in plex_eps:
+                            ep_rk = str(pep.get("ratingKey", ""))
+                            if not ep_rk or ep_rk in active_keys:
+                                continue
+                            if int(pep.get("viewCount") or 0) <= 0:
+                                continue
+                            lv = int(pep.get("lastViewedAt") or show.get("lastRatedAt") or 0)
+                            if lv and (now_ts - lv) < min_age:
+                                continue
+                            s_num = pep.get("parentIndex")
+                            e_num = pep.get("index")
+                            if s_num is not None and e_num is not None:
+                                eligible_se_ep.add((int(s_num), int(e_num)))
+
+                        if not eligible_se_ep:
                             continue
 
-                    if mode == "delete_after_rating" and plex_rating and not trakt_rating:
-                        try:
-                            score_int = max(1, min(10, int(round(float(plex_rating)))))
-                            tr_rate = urllib.request.Request(
-                                "https://api.trakt.tv/sync/ratings",
-                                data=json.dumps({"movies": [{"rating": score_int, "ids": ids_obj}]}).encode("utf-8"),
-                                headers=trakt_headers,
-                                method="POST",
+                        sonarr_eps = radarr_sonarr_sync._api_request("http://127.0.0.1:8989", sonarr_key, f"/api/v3/episode?seriesId={s_obj['id']}", timeout=6) or []
+                        unmon_ids = []
+                        del_ef_ids = set()
+                        for sep in sonarr_eps:
+                            key_se = (int(sep.get("seasonNumber") or -1), int(sep.get("episodeNumber") or -1))
+                            if key_se in eligible_se_ep:
+                                if sep.get("monitored") and sep.get("id"):
+                                    unmon_ids.append(int(sep["id"]))
+                                if sep.get("episodeFileId"):
+                                    del_ef_ids.add(int(sep["episodeFileId"]))
+
+                        if unmon_ids:
+                            radarr_sonarr_sync._api_request(
+                                "http://127.0.0.1:8989",
+                                sonarr_key,
+                                "/api/v3/episode/monitor",
+                                method="PUT",
+                                payload={"episodeIds": unmon_ids, "monitored": False},
+                                timeout=6,
                             )
-                            with urllib.request.urlopen(tr_rate, timeout=8) as r_resp:
-                                if r_resp.status not in (200, 201):
-                                    continue
-                        except Exception:
-                            continue  # Failed to push rating to Trakt -> skip deletion for now
-
-                # 2) Ensure Trakt watched status & rating reach Plex and persist before deleting
-                synced_to_plex_now = False
-                if (trakt_watched or trakt_rating) and not plex_watched:
-                    try:
-                        sc_req = urllib.request.Request(
-                            f"http://127.0.0.1:32400/:/scrobble?identifier=com.plexapp.plugins.library&key={rk}",
-                            headers=headers,
-                            method="GET",
-                        )
-                        urllib.request.urlopen(sc_req, timeout=5).close()
-                        synced_to_plex_now = True
-                        print(f"✓ [WatchedCleanup] Synced Trakt watched status to Plex: {item.get('title')}")
-                    except Exception:
-                        continue  # Could not mark watched in Plex -> skip deletion
-
-                if mode == "delete_after_rating" and trakt_rating and not plex_rating:
-                    try:
-                        pr_req = urllib.request.Request(
-                            f"http://127.0.0.1:32400/:/rate?identifier=com.plexapp.plugins.library&key={rk}&rating={trakt_rating}",
-                            headers=headers,
-                            method="PUT",
-                        )
-                        urllib.request.urlopen(pr_req, timeout=5).close()
-                        synced_to_plex_now = True
-                        print(f"★ [WatchedCleanup] Synced Trakt rating ({trakt_rating}/10) to Plex: {item.get('title')} (waiting 1 cycle before deletion)")
-                    except Exception:
-                        continue  # Could not save rating in Plex -> skip deletion
-
-                if synced_to_plex_now:
-                    continue  # Wait for next cycle so Plex DB & Plex.tv cloud confirm watched+rating before file removal
-
-                # Remove from Plex Watchlist
-                if plex_guid:
-                    try:
-                        rm_req = urllib.request.Request(
-                            f"https://discover.provider.plex.tv/actions/removeFromWatchlist?ratingKey={plex_guid}",
-                            headers={"X-Plex-Token": plex_token, "X-Plex-Client-Identifier": "podmedia-sync"},
-                            method="PUT",
-                        )
-                        urllib.request.urlopen(rm_req, timeout=6).close()
+                        for ef_id in del_ef_ids:
+                            try:
+                                radarr_sonarr_sync._api_request("http://127.0.0.1:8989", sonarr_key, f"/api/v3/episodefile/{ef_id}", method="DELETE", timeout=6)
+                                cleaned_any_show = True
+                            except Exception:
+                                pass
+                        if del_ef_ids:
+                            print(f"🧹 [WatchedCleanup] Deleted {len(del_ef_ids)} watched episode file(s) & unmonitored in Sonarr: {show.get('title')}")
                     except Exception:
                         pass
 
-                # Remove from Trakt Watchlist
-                if trakt_headers and ids_obj:
+                if cleaned_any_show and not plex_stub_mode:
                     try:
-                        tr_rm = urllib.request.Request(
-                            "https://api.trakt.tv/sync/watchlist/remove",
-                            data=json.dumps({"movies": [{"ids": ids_obj}]}).encode("utf-8"),
-                            headers=trakt_headers,
-                            method="POST",
-                        )
-                        urllib.request.urlopen(tr_rm, timeout=6).close()
+                        urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/refresh", headers=headers), timeout=4).close()
+                        schedule_plex_empty_trash("series", delay=8)
                     except Exception:
                         pass
-
-                # Unmonitor + delete file via Radarr (keeps DB in sync and prevents re-download)
-                if radarr_online and radarr_movies is not None and tmdb_id:
-                    for rm in radarr_movies:
-                        if rm.get("tmdbId") == tmdb_id:
-                            mf_id = (rm.get("movieFile") or {}).get("id")
-                            if rm.get("monitored"):
-                                rm["monitored"] = False
-                                try:
-                                    radarr_sonarr_sync._api_request("http://127.0.0.1:7878", radarr_key, f"/api/v3/movie/{rm['id']}", method="PUT", payload=rm, timeout=6)
-                                except Exception:
-                                    pass
-                            if mf_id:
-                                try:
-                                    radarr_sonarr_sync._api_request("http://127.0.0.1:7878", radarr_key, f"/api/v3/moviefile/{mf_id}", method="DELETE", timeout=8)
-                                    cleaned_any_movie = True
-                                    print(f"🧹 [WatchedCleanup] Deleted watched movie file & unmonitored: {item.get('title')}")
-                                except Exception as e:
-                                    print(f"⚠️ [WatchedCleanup] Could not delete {item.get('title')}: {e}")
-                            break
-
-            if cleaned_any_movie:
-                try:
-                    urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/refresh", headers=headers), timeout=4).close()
-                    urllib.request.urlopen(urllib.request.Request(f"http://127.0.0.1:32400/library/sections/{sec_key}/emptyTrash", headers=headers, method="PUT"), timeout=4).close()
-                except Exception:
-                    pass
     except Exception as e:
         print(f"⚠️ [WatchedCleanup] Skipped: {e}")
     finally:
@@ -1033,6 +1387,8 @@ def _load_music_automation_config():
     res = {
         "delete_disliked_music": True,
         "sync_music_ratings": True,
+        "music_discovery_schedule": "weekly",
+        "music_discovery_size": 20,
         "aurral_user_api_key": "",
         "listenbrainz_token": "",
     }
@@ -1042,6 +1398,9 @@ def _load_music_automation_config():
             cfg.read(cfg_path, encoding="utf-8")
             res["delete_disliked_music"] = cfg.getboolean("automation", "delete_disliked_music", fallback=True)
             res["sync_music_ratings"] = cfg.getboolean("automation", "sync_music_ratings", fallback=True)
+            sched = cfg.get("automation", "music_discovery_schedule", fallback="weekly").strip().lower()
+            res["music_discovery_schedule"] = sched if sched in ("off", "daily", "weekly", "biweekly", "monthly") else "weekly"
+            res["music_discovery_size"] = max(5, min(50, cfg.getint("automation", "music_discovery_size", fallback=20)))
             res["aurral_user_api_key"] = cfg.get("automation", "aurral_user_api_key", fallback="").strip()
             res["listenbrainz_token"] = cfg.get("automation", "listenbrainz_token", fallback="").strip()
     except Exception:
@@ -1594,6 +1953,167 @@ def cleanup_disliked_music_tracks(max_rating=3.9, music_dir=None, force_empty_tr
         music_dir=music_dir,
         force_empty_trash=force_empty_trash,
     )
+
+
+_music_discovery_lock = threading.Lock()
+_DISCOVERY_INTERVALS = {
+    "daily": 86400,
+    "weekly": 7 * 86400,
+    "biweekly": 14 * 86400,
+    "monthly": 30 * 86400,
+}
+
+
+def run_scheduled_music_discovery(force=False):
+    """Automatically refreshes & downloads Aurral recommendation Flows and auto-sync playlists
+    on a configurable schedule (default: weekly), catching up cleanly even when Music Mode is not 24/7."""
+    if not _music_discovery_lock.acquire(blocking=False):
+        return {"status": "busy"}
+    try:
+        import json
+        cfg = _load_music_automation_config()
+        schedule = cfg["music_discovery_schedule"]
+        size = cfg["music_discovery_size"]
+        if not force and schedule == "off":
+            return {"status": "disabled"}
+
+        interval_sec = _DISCOVERY_INTERVALS.get(schedule, 7 * 86400)
+        state = _load_music_ratings_state()
+        last_ts = float(state.get("last_discovery_run_ts") or 0)
+        now_ts = time.time()
+
+        if not force and last_ts > 0 and (now_ts - last_ts) < interval_sec:
+            return {"status": "not_due", "next_in_hours": round((interval_sec - (now_ts - last_ts)) / 3600, 1)}
+
+        if not _is_aurral_online():
+            return {"status": "aurral_offline"}
+
+        catalog = _read_aurral_music_catalog()
+        user_key = cfg["aurral_user_api_key"]
+        api_key = user_key or catalog["general_api_key"]
+        if not api_key:
+            return {"status": "no_api_key"}
+
+        headers = {"X-Api-Key": api_key, "Content-Type": "application/json", "Accept": "application/json"}
+
+        # 1. Inspect existing Aurral Flows & static playlists
+        st_req = urllib.request.Request("http://127.0.0.1:3001/api/playlists/status", headers=headers)
+        with urllib.request.urlopen(st_req, timeout=10) as sresp:
+            st_data = json.loads(sresp.read().decode("utf-8"))
+
+        flows = st_data.get("flows") or []
+        static_pls = st_data.get("staticPlaylists") or []
+        triggered_flows = []
+        created_flow = None
+        synced_playlists = []
+        note = ""
+
+        # 2. Trigger existing enabled Flows; if none exist and user API key is set, create Discover Weekly Flow
+        enabled_flows = [f for f in flows if f.get("enabled") is not False]
+        if not flows and user_key:
+            try:
+                c_body = json.dumps({
+                    "templateId": "discover-weekly",
+                    "name": "Discover Weekly",
+                    "autoDownload": True,
+                    "size": size,
+                }).encode("utf-8")
+                c_req = urllib.request.Request("http://127.0.0.1:3001/api/playlists/flows", data=c_body, headers=headers, method="POST")
+                with urllib.request.urlopen(c_req, timeout=15) as cresp:
+                    cdata = json.loads(cresp.read().decode("utf-8"))
+                    flow_obj = cdata.get("flow") or {}
+                    if flow_obj.get("id"):
+                        created_flow = flow_obj.get("name") or "Discover Weekly"
+                        enabled_flows = [flow_obj]
+                        # Ensure enabled & target size applied
+                        try:
+                            en_req = urllib.request.Request(
+                                f"http://127.0.0.1:3001/api/playlists/flows/{flow_obj['id']}/enabled",
+                                data=json.dumps({"enabled": True}).encode("utf-8"),
+                                headers=headers,
+                                method="PUT",
+                            )
+                            urllib.request.urlopen(en_req, timeout=8).close()
+                        except Exception:
+                            pass
+            except Exception as e:
+                print(f"⚠️ [MusicDiscovery] Could not create Discover Weekly flow: {e}")
+        elif not flows and not user_key:
+            note = "Discover Weekly Flow oluşturmak için Aurral Kullanıcı API Anahtarı girin (şimdilik mevcut playlistler eşitlendi)."
+
+        for fl in enabled_flows:
+            fid = fl.get("id")
+            if not fid:
+                continue
+            try:
+                # Ensure autoDownload & updated size are respected
+                if fl.get("autoDownload") is False or int(fl.get("size") or 0) != size:
+                    try:
+                        u_req = urllib.request.Request(
+                            f"http://127.0.0.1:3001/api/playlists/flows/{fid}",
+                            data=json.dumps({"autoDownload": True, "size": size}).encode("utf-8"),
+                            headers=headers,
+                            method="PUT",
+                        )
+                        urllib.request.urlopen(u_req, timeout=8).close()
+                    except Exception:
+                        pass
+                run_req = urllib.request.Request(
+                    f"http://127.0.0.1:3001/api/playlists/start/{fid}",
+                    data=json.dumps({"limit": size}).encode("utf-8"),
+                    headers=headers,
+                    method="POST",
+                )
+                with urllib.request.urlopen(run_req, timeout=15) as rresp:
+                    if rresp.status in (200, 202):
+                        triggered_flows.append(fl.get("name") or fid)
+                        print(f"✨ [MusicDiscovery] Started scheduled flow download ({size} tracks): {fl.get('name') or fid}")
+            except Exception as e:
+                print(f"⚠️ [MusicDiscovery] Flow start failed for {fid}: {e}")
+
+        # 3. Also refresh any sync-enabled static playlists (e.g. Last.fm Mix)
+        for pl in static_pls:
+            pid = pl.get("id")
+            imp = pl.get("importSource") or {}
+            if pid and imp.get("syncEnabled"):
+                try:
+                    p_req = urllib.request.Request(
+                        f"http://127.0.0.1:3001/api/playlists/{pid}/sync",
+                        data=b"{}",
+                        headers=headers,
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(p_req, timeout=15) as presp:
+                        if presp.status in (200, 202):
+                            synced_playlists.append(pl.get("name") or pid)
+                            print(f"✨ [MusicDiscovery] Synced static playlist: {pl.get('name') or pid}")
+                except Exception as e:
+                    print(f"⚠️ [MusicDiscovery] Static playlist sync failed for {pid}: {e}")
+
+        if triggered_flows or synced_playlists:
+            state["last_discovery_run_ts"] = now_ts
+            state["last_discovery_summary"] = {
+                "ts": int(now_ts),
+                "schedule": schedule,
+                "flows": triggered_flows,
+                "playlists": synced_playlists,
+            }
+            _save_music_ratings_state(state)
+
+        return {
+            "status": "ok",
+            "schedule": schedule,
+            "size": size,
+            "created_flow": created_flow,
+            "triggered_flows": triggered_flows,
+            "synced_playlists": synced_playlists,
+            "note": note,
+        }
+    except Exception as e:
+        print(f"⚠️ [MusicDiscovery] Skipped: {e}")
+        return {"status": "error", "error": str(e)}
+    finally:
+        _music_discovery_lock.release()
 
 
 watcher_instance = None

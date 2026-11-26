@@ -276,6 +276,14 @@ class AppHandler(BaseHTTPRequestHandler):
             except Exception as e:
                 self.send_json({"status": "error", "message": str(e)}, 500)
 
+        elif path == '/api/music/discovery/run':
+            try:
+                import media_watcher
+                res = media_watcher.run_scheduled_music_discovery(force=True)
+                self.send_json(res)
+            except Exception as e:
+                self.send_json({"status": "error", "message": str(e)}, 500)
+
         elif path == '/api/trakt/sync':
             if not podman_manager.is_plextraktsync_configured():
                 self.send_json({"status": "error", "message": "PlexTraktSync henüz kurulmamış."})
@@ -283,12 +291,12 @@ class AppHandler(BaseHTTPRequestHandler):
             try:
                 import media_watcher
                 ok = media_watcher.sync_trakt_watchlist()
-                if media_watcher.watcher_instance and media_watcher.watcher_instance.watched_media_action != "keep":
-                    threading.Thread(
-                        target=media_watcher.cleanup_watched_media,
-                        args=(media_watcher.watcher_instance.watched_media_action,),
-                        daemon=True,
-                    ).start()
+                act = media_watcher.watcher_instance.watched_media_action if media_watcher.watcher_instance else "keep"
+                threading.Thread(
+                    target=media_watcher.cleanup_watched_media,
+                    args=(act,),
+                    daemon=True,
+                ).start()
                 import radarr_sonarr_sync
                 radarr_sonarr_sync.trigger_radarr_command("ImportListSync")
                 radarr_sonarr_sync.trigger_sonarr_command("ImportListSync")

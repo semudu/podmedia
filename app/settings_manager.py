@@ -313,6 +313,8 @@ def get_settings():
         "music_start_slskd": cfg.getboolean("automation", "music_start_slskd", fallback=True),
         "delete_disliked_music": cfg.getboolean("automation", "delete_disliked_music", fallback=True),
         "sync_music_ratings": cfg.getboolean("automation", "sync_music_ratings", fallback=True),
+        "music_discovery_schedule": cfg.get("automation", "music_discovery_schedule", fallback="weekly"),
+        "music_discovery_size": cfg.getint("automation", "music_discovery_size", fallback=20),
         "aurral_user_api_key_set": bool(cfg.get("automation", "aurral_user_api_key", fallback="").strip()),
         "listenbrainz_token_set": bool(cfg.get("automation", "listenbrainz_token", fallback="").strip()),
         "slskd_available": slskd_cfg["available"],
@@ -360,6 +362,10 @@ def save_settings(payload):
     music_start_slskd = bool(payload.get("music_start_slskd", True))
     delete_disliked_music = bool(payload.get("delete_disliked_music", True))
     sync_music_ratings = bool(payload.get("sync_music_ratings", True))
+    disc_sched = str(payload.get("music_discovery_schedule", "weekly")).strip().lower()
+    if disc_sched not in ("off", "daily", "weekly", "biweekly", "monthly"):
+        disc_sched = "weekly"
+    disc_size = max(5, min(50, int(payload.get("music_discovery_size", 20) or 20)))
 
     cfg.set("server", "port", str(port))
     if not cfg.has_option("paths", "media_dir"):
@@ -375,6 +381,8 @@ def save_settings(payload):
     cfg.set("automation", "music_start_slskd", "true" if music_start_slskd else "false")
     cfg.set("automation", "delete_disliked_music", "true" if delete_disliked_music else "false")
     cfg.set("automation", "sync_music_ratings", "true" if sync_music_ratings else "false")
+    cfg.set("automation", "music_discovery_schedule", disc_sched)
+    cfg.set("automation", "music_discovery_size", str(disc_size))
 
     # Preserve existing tokens unless a new non-empty token is entered
     new_aurral_key = str(payload.get("aurral_user_api_key", "") or "").strip()
@@ -398,6 +406,8 @@ def save_settings(payload):
             media_watcher.watcher_instance.watched_media_action = watched_action
             media_watcher.watcher_instance.delete_disliked_music = delete_disliked_music
             media_watcher.watcher_instance.sync_music_ratings = sync_music_ratings
+            media_watcher.watcher_instance.music_discovery_schedule = disc_sched
+            media_watcher.watcher_instance.music_discovery_size = disc_size
         if new_aurral_key or new_lb_token or sync_music_ratings:
             import threading
             threading.Thread(
@@ -489,6 +499,8 @@ def reset_to_defaults():
         "music_start_slskd": True,
         "delete_disliked_music": True,
         "sync_music_ratings": True,
+        "music_discovery_schedule": "weekly",
+        "music_discovery_size": 20,
         "slskd_listen_port": 50300,
         "slskd_share_music": True,
         "dl_limit_mbps": 0,
